@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import crypto from 'node:crypto';
 
-// Temporary store for verification codes (15 minute expiration)
 interface VerificationRecord {
   code: string;
   name: string;
@@ -10,10 +10,15 @@ interface VerificationRecord {
 
 const verificationStore = new Map<string, VerificationRecord>();
 
+function signVerification(email: string, code: string, expiresAt: number): string {
+  const secret = process.env.VERIFY_SECRET || 'finvelayudham_verify_hmac_secret_2026';
+  return crypto.createHmac('sha256', secret).update(`${email.trim().toLowerCase()}:${code.trim()}:${expiresAt}`).digest('hex');
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, email, code, name } = body;
+    const { action, email, code, name, verifyToken } = body;
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'Valid email address is required' }, { status: 400 });
@@ -29,11 +34,16 @@ export async function POST(req: Request) {
       const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
       const userName = name || 'Valued Member';
 
+      // In-memory cache
       verificationStore.set(cleanEmail, {
         code: generatedCode,
         name: userName,
         expiresAt,
       });
+
+      // Stateless cryptographic signature for Vercel multi-worker resilience
+      const sig = signVerification(cleanEmail, generatedCode, expiresAt);
+      const token = `${expiresAt}.${sig}`;
 
       const resendApiKey = process.env.RESEND_API_KEY;
       const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
@@ -117,7 +127,6 @@ export async function POST(req: Request) {
             delivered = true;
           } else {
             const errJson = await resendRes.json().catch(() => null);
-            // Catch Resend testing sandbox restriction
             if (errJson && errJson.message && errJson.message.includes('You can only send testing emails to your own email address')) {
               const match = errJson.message.match(/\(([^)]+)\)/);
               const allowedEmail = match ? match[1] : 'balajibuddy1794@gmail.com';
@@ -149,7 +158,7 @@ export async function POST(req: Request) {
         }
       }
 
-      // Try SMTP if credentials exist
+      // Try SMTP
       if (!delivered && smtpUser && smtpPass) {
         try {
           const transporter = nodemailer.createTransport({
@@ -174,13 +183,25 @@ export async function POST(req: Request) {
 
       console.log(`[FinVelayudham Auth] Verification Code for ${cleanEmail}: ${generatedCode}`);
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         delivered,
         deliveredTo,
-        sandboxCode: generatedCode, // Provided for instant sandbox testing
+        token,
+        sandboxCode: generatedCode,
         message: `Verification code dispatched to ${deliveredTo}`,
       });
+
+      // Also set secure verification cookie
+      response.cookies.set('finvelayudham_verify_pending', `${cleanEmail}:${generatedCode}:${expiresAt}:${sig}`, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 900,
+        path: '/',
+      });
+
+      return response;
     }
 
     // -------------------------------------------------------------
@@ -191,31 +212,65 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Verification code is required' }, { status: 400 });
       }
 
+      const inputCode = code.trim();
+      let isValid = false;
+
+      // Check 1: In-memory store
       const record = verificationStore.get(cleanEmail);
-
-      // Check if code matches (also accept master bypass code for testing if needed)
-      if (!record) {
-        return NextResponse.json({ error: 'Verification code expired or not found. Please request a new one.' }, { status: 400 });
-      }
-
-      if (Date.now() > record.expiresAt) {
+      if (record && record.code === inputCode && Date.now() <= record.expiresAt) {
+        isValid = true;
         verificationStore.delete(cleanEmail);
-        return NextResponse.json({ error: 'Verification code has expired. Please request a new one.' }, { status: 400 });
       }
 
-      if (record.code !== code.trim()) {
-        return NextResponse.json({ error: 'Incorrect confirmation code. Please check your email and try again.' }, { status: 400 });
+      // Check 2: Token verification passed from client or cookie
+      if (!isValid && verifyToken && verifyToken.includes('.')) {
+        const [expStr, sig] = verifyToken.split('.');
+        const expNum = parseInt(expStr);
+        if (Date.now() <= expNum) {
+          const expectedSig = signVerification(cleanEmail, inputCode, expNum);
+          if (expectedSig === sig) {
+            isValid = true;
+          }
+        }
       }
 
-      // Validated successfully! Remove record
-      verificationStore.delete(cleanEmail);
+      // Check 3: Cookie validation
+      if (!isValid) {
+        const cookieHeader = req.headers.get('cookie') || '';
+        const match = cookieHeader.match(/finvelayudham_verify_pending=([^;]+)/);
+        if (match) {
+          const cookieVal = decodeURIComponent(match[1]);
+          const [cEmail, cCode, cExp, cSig] = cookieVal.split(':');
+          if (cEmail === cleanEmail && cCode === inputCode && Date.now() <= parseInt(cExp)) {
+            const expectedSig = signVerification(cleanEmail, inputCode, parseInt(cExp));
+            if (expectedSig === cSig) {
+              isValid = true;
+            }
+          }
+        }
+      }
 
-      return NextResponse.json({
+      if (!isValid) {
+        return NextResponse.json(
+          { error: 'Incorrect or expired confirmation code. Please check your email and try again.' },
+          { status: 400 }
+        );
+      }
+
+      const response = NextResponse.json({
         success: true,
         verified: true,
         email: cleanEmail,
         message: 'Email confirmed successfully! Account unlocked.',
       });
+
+      // Clear pending verification cookie
+      response.cookies.set('finvelayudham_verify_pending', '', {
+        maxAge: 0,
+        path: '/',
+      });
+
+      return response;
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

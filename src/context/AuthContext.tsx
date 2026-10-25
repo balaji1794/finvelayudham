@@ -43,6 +43,7 @@ function deriveNameFromEmail(email: string): string {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeVerifyToken, setActiveVerifyToken] = useState<string | null>(null);
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -100,7 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'send-code', email, name }),
       });
-      return await res.json();
+      const data = await res.json();
+      if (data.token) {
+        setActiveVerifyToken(data.token);
+      }
+      return data;
     } catch (err: any) {
       return { success: false, message: err.message || 'Failed to dispatch code' };
     }
@@ -111,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'confirm-code', email, code }),
+        body: JSON.stringify({ action: 'confirm-code', email, code, verifyToken: activeVerifyToken }),
       });
       const data = await res.json();
 
