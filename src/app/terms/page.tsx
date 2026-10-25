@@ -37,9 +37,9 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="font-serif text-lg font-bold text-foreground mb-2">4. Subscriptions and Payments</h2>
+            <h2 className="font-serif text-lg font-bold text-foreground mb-2">4. 100% Free Service & Zero Subscriptions</h2>
             <p>
-              Free accounts are provided without charge for up to 25 assets. Pro features are provided through annual or multi-month subscriptions.
+              FinVelayudham is provided completely free of charge with unlimited access to all features, asset tracking, calculators, and analytical tools for all users. There are no subscription fees, paid tiers, paywalls, or recurring charges.
             </p>
           </section>
         </div>

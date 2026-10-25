@@ -4,7 +4,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'FinVelayudham · All your money, in one place',
   description:
-    'Track every account, asset, expense, and goal in one dashboard. Net worth, cashflow, and growth across 45+ currencies. No bank logins. Free for 25 assets.',
+    'Track every account, asset, expense, and goal in one dashboard. Net worth, cashflow, and growth across 45+ currencies. No bank logins. 100% Free with unlimited tracking.',
   metadataBase: new URL('https://www.finvelayudham.app'),
   keywords: [
     'personal finance',

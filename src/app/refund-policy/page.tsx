@@ -16,23 +16,23 @@ export default function RefundPolicyPage() {
 
         <div className="prose prose-sm dark:prose-invert space-y-6 text-xs sm:text-sm text-foreground/80 leading-relaxed">
           <section>
-            <h2 className="font-serif text-lg font-bold text-foreground mb-2">1. 14-Day Money-Back Guarantee</h2>
+            <h2 className="font-serif text-lg font-bold text-foreground mb-2">1. 100% Free Platform Policy</h2>
             <p>
-              We want you to be completely delighted with FinVelayudham Pro. If you upgrade to an annual or lifetime Pro subscription and find it does not meet your expectations, you are entitled to a full, no-questions-asked refund within 14 days of purchase.
+              FinVelayudham is completely free for all users with unlimited access to all features, asset tracking, calculators, and tools. Because we do not charge subscription fees, sell paid upgrades, or collect payment details, no monetary transactions occur on the platform.
             </p>
           </section>
 
           <section>
-            <h2 className="font-serif text-lg font-bold text-foreground mb-2">2. How to Request a Refund</h2>
+            <h2 className="font-serif text-lg font-bold text-foreground mb-2">2. Zero Hidden Charges</h2>
             <p>
-              To claim your refund within the 14-day window, simply send an email to <a href="mailto:support@finvelayudham.app" className="text-primary underline">support@finvelayudham.app</a> with your registered account email and payment reference ID. Refunds are processed back to your original payment method within 5–7 business days.
+              We do not ask for credit cards, bank account debits, or recurring payment mandates. Every single feature—including unlimited asset tracking, live FX currency conversions, and automated sync tools—is available without cost.
             </p>
           </section>
 
           <section>
-            <h2 className="font-serif text-lg font-bold text-foreground mb-2">3. Subscription Cancellations</h2>
+            <h2 className="font-serif text-lg font-bold text-foreground mb-2">3. Questions or Inquiries</h2>
             <p>
-              You may cancel recurring subscription auto-renewals anytime from your Account Settings. Upon cancellation, your Pro features remain active until the end of your prepaid billing period.
+              If you have any questions regarding our free platform policy or data handling practices, please contact our support team at <a href="mailto:support@finvelayudham.app" className="text-primary underline">support@finvelayudham.app</a>.
             </p>
           </section>
         </div>

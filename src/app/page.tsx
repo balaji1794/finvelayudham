@@ -40,7 +40,7 @@ export default function HomePage() {
     },
     {
       q: 'Is FinVelayudham really free?',
-      a: 'Yes. Free forever for up to 25 assets, with no credit card required. If you hold more assets, there is a Pro plan that unlocks unlimited tracking, family profiles, and advanced auto-refresh features.'
+      a: 'Yes! FinVelayudham is 100% free and completely unlimited for everyone. There are no paid tiers, no subscriptions, and no asset limits. You can track unlimited investments, loans, goals, and snapshots without paying anything.'
     },
     {
       q: 'What Indian assets does FinVelayudham support?',
@@ -97,7 +97,7 @@ export default function HomePage() {
 
           <div className="mt-4 flex items-center justify-center gap-6 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-primary" /> Free forever for 25 assets
+              <Check className="w-4 h-4 text-primary" /> 100% Free & Unlimited
             </span>
             <span className="flex items-center gap-1.5">
               <Check className="w-4 h-4 text-primary" /> No credit card required
@@ -314,115 +314,94 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Pricing / All Features Free Section */}
       <section className="py-20 border-b border-border/50" id="pricing">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="text-xs uppercase font-bold tracking-wider text-primary">Transparent Pricing</span>
+            <span className="text-xs uppercase font-bold tracking-wider text-primary">Completely Free</span>
             <h2 className="font-serif text-3xl sm:text-5xl font-bold text-foreground mt-2">
-              Start free. Upgrade when you need more.
+              100% Free. Unlimited for Everyone.
             </h2>
             <p className="mt-3 text-muted-foreground">
-              A generous free tier for getting started. Pro for serious wealth tracking.
+              No subscriptions, no paywalls, and no asset limits. Every single feature is unlocked with unlimited usage for all users.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Free Plan */}
-            <div className="bg-card border border-border rounded-2xl p-8 shadow-sm flex flex-col justify-between">
-              <div>
-                <h3 className="font-serif text-2xl font-bold text-foreground">Free</h3>
-                <div className="mt-4 flex items-baseline">
-                  <span className="font-serif text-4xl font-bold text-foreground">₹0</span>
-                  <span className="text-muted-foreground ml-1">/ forever</span>
-                </div>
-                <p className="text-xs text-primary font-semibold mt-1">+ 14-day Pro trial available</p>
-
-                <ul className="mt-8 space-y-3 text-sm text-foreground/90">
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Track up to 25 investments</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>5 liabilities & 3 financial goals</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>2 net worth snapshots / month</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Basic income & expense tracking</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Financial health check & essentials check</span>
-                  </li>
-                </ul>
-              </div>
-
-              <Link
-                href="/login?mode=register"
-                className="mt-8 w-full block text-center py-3 border border-border bg-muted/60 hover:bg-muted text-foreground font-semibold rounded-md transition-colors"
-              >
-                Get Started Free
-              </Link>
-            </div>
-
-            {/* Pro Plan */}
-            <div className="bg-card border-2 border-primary rounded-2xl p-8 shadow-xl flex flex-col justify-between relative">
-              <div className="absolute -top-3 right-6 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                Most Popular · Save 37%
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-card border-2 border-primary/40 rounded-2xl p-8 sm:p-10 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-4 py-1.5 rounded-bl-xl uppercase tracking-wider">
+                Unlimited Access · Zero Cost
               </div>
 
               <div>
-                <h3 className="font-serif text-2xl font-bold text-foreground">Pro</h3>
-                <div className="mt-4 flex items-baseline">
-                  <span className="font-serif text-4xl font-bold text-foreground">₹749</span>
-                  <span className="text-muted-foreground ml-1">/ year</span>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-3">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Free Forever Plan</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">About ₹2/day, cheaper than a cup of tea</p>
-                <p className="text-xs text-foreground/80 mt-1 font-medium">Also available: 6 months at ₹599 · Lifetime at ₹3,499</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-serif text-5xl font-bold text-foreground">₹0</span>
+                  <span className="text-muted-foreground font-medium">/ forever</span>
+                </div>
+                <p className="text-sm text-foreground/80 mt-2">
+                  Full unrestricted access to all wealth tracking tools, calculators, multi-currency support, and analytics.
+                </p>
 
-                <ul className="mt-8 space-y-3 text-sm text-foreground/90">
-                  <li className="flex items-center gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-8 pt-8 border-t border-border">
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
                     <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="font-semibold">Track every investment without limits</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
+                    <span className="font-semibold">Track unlimited investments</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
                     <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Unlimited liabilities & custom goals</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
+                    <span className="font-semibold">Unlimited liabilities & custom goals</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
                     <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Track your net worth growth anytime</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
+                    <span>Unlimited net worth snapshots</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
                     <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Full income & expense cashflow insights</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
+                    <span>Complete income & expense cashflow</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
                     <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Import from any broker or custom CSV</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
+                    <span>Import from Zerodha, Groww & CSV</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
                     <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span>Auto-refresh live asset prices & FX rates</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
+                    <span>Live asset prices & 45+ currencies</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
+                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span>Emergency fund & insurance checks</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
+                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span>All 10 financial calculators included</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
                     <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
                     <span>Family & multi-profile segmentation</span>
-                  </li>
-                </ul>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-foreground/90">
+                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                    <span>Full data export (CSV/JSON) anytime</span>
+                  </div>
+                </div>
               </div>
 
-              <Link
-                href="/login?mode=register"
-                className="mt-8 w-full block text-center py-3 bg-primary text-primary-foreground font-semibold rounded-md shadow hover:bg-primary/90 transition-all"
-              >
-                Upgrade to Pro
-              </Link>
+              <div className="mt-8 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-xs text-muted-foreground">
+                  No credit card required · Instant sign-up in 10 seconds
+                </div>
+                <Link
+                  href="/login?mode=register"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-semibold px-6 py-3 rounded-md shadow hover:bg-primary/90 transition-all text-sm"
+                >
+                  Start Tracking Free
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -472,7 +451,7 @@ export default function HomePage() {
             Start tracking your wealth today
           </h2>
           <p className="mt-4 text-muted-foreground text-base max-w-xl mx-auto">
-            Free forever for up to 25 assets. No credit card required. Takes less than 10 seconds to sign up.
+            100% free with unlimited tracking forever. No credit card required. Takes less than 10 seconds to sign up.
           </p>
           <div className="mt-8">
             <Link
