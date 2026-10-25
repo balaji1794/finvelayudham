@@ -18,6 +18,10 @@ import {
   CreditCard,
   ArrowUpRight,
   ArrowDownLeft,
+  Mail,
+  Send,
+  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -57,6 +61,34 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [saveStatus, setSaveStatus] = useState<string>('');
+
+  // Email Diagnostic State
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<{ success: boolean; delivered?: boolean; simulated?: boolean; message: string; previewHtml?: string } | null>(null);
+  const [showEmailPreviewModal, setShowEmailPreviewModal] = useState(false);
+
+  const handleSendTestEmail = async () => {
+    if (!user) return;
+    setEmailSending(true);
+    setEmailStatus(null);
+    try {
+      const res = await fetch('/api/auth/send-welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, name: user.name, type: 'welcome' }),
+      });
+      const data = await res.json();
+      setEmailStatus(data);
+    } catch (err: any) {
+      setEmailStatus({
+        success: false,
+        delivered: false,
+        message: err.message || 'Failed to dispatch email request',
+      });
+    } finally {
+      setEmailSending(false);
+    }
+  };
 
   // Redirect to login if user is not signed in
   useEffect(() => {
@@ -915,6 +947,97 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Email Verification & Dispatch Diagnostics */}
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm text-foreground">Transactional Email Delivery Status</h3>
+                    <p className="text-xs text-muted-foreground">Registered recipient: <strong>{user.email}</strong></p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSendTestEmail}
+                  disabled={emailSending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-all disabled:opacity-60 shadow-sm"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {emailSending ? 'Dispatching...' : 'Send Test Email'}
+                </button>
+              </div>
+
+              {emailStatus && (
+                <div
+                  className={`p-3.5 rounded-lg text-xs border ${
+                    emailStatus.delivered
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    {emailStatus.delivered ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-1">
+                      <div className="font-semibold">
+                        {emailStatus.delivered ? 'Live Email Dispatched!' : 'Email Generated in Simulation Mode'}
+                      </div>
+                      <p className="text-[11px] leading-relaxed">{emailStatus.message}</p>
+                      {emailStatus.previewHtml && (
+                        <button
+                          onClick={() => setShowEmailPreviewModal(true)}
+                          className="mt-1 text-primary font-bold underline hover:opacity-80 block"
+                        >
+                          Preview Generated Email Template →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step-by-step Setup Guide */}
+              <div className="bg-muted/40 border border-border rounded-lg p-4 space-y-3">
+                <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <span>How to connect real-world delivery to your Gmail inbox (2 Steps)</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Google Mail and spam filters block unauthenticated web servers from sending mail directly to Gmail addresses.
+                  To have welcome emails land directly in <strong>{user.email}</strong>, connect a free transactional relay:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 bg-card border border-border rounded-lg text-xs space-y-1.5">
+                    <div className="font-semibold text-foreground flex items-center justify-between">
+                      <span>Option A: Resend (Recommended)</span>
+                      <span className="text-[10px] text-primary font-bold">3,000 Free/Mo</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      1. Sign up at <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">resend.com</a><br/>
+                      2. Add <code className="bg-muted px-1 py-0.5 rounded">RESEND_API_KEY</code> to your Vercel Project Environment Variables.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-card border border-border rounded-lg text-xs space-y-1.5">
+                    <div className="font-semibold text-foreground flex items-center justify-between">
+                      <span>Option B: Gmail SMTP</span>
+                      <span className="text-[10px] text-primary font-bold">Your Gmail</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      1. Generate Google App Password in Google Account Security.<br/>
+                      2. Add <code className="bg-muted px-1 py-0.5 rounded">SMTP_USER</code> and <code className="bg-muted px-1 py-0.5 rounded">SMTP_PASS</code> in Vercel.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Data Management Actions */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
               <h3 className="font-semibold text-sm text-foreground">Data Export & Deletion Rights</h3>
@@ -959,6 +1082,33 @@ export default function DashboardPage() {
         onAdd={handleAddLiability}
         defaultCurrency={currency}
       />
+
+      {/* Email Preview Modal */}
+      {showEmailPreviewModal && emailStatus?.previewHtml && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-card border border-border w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-muted/40">
+              <div>
+                <h3 className="font-semibold text-sm text-foreground">Generated Email Template Preview</h3>
+                <p className="text-[11px] text-muted-foreground">Recipient: {user.email}</p>
+              </div>
+              <button
+                onClick={() => setShowEmailPreviewModal(false)}
+                className="text-xs bg-muted hover:bg-muted/80 text-foreground px-3 py-1.5 rounded-lg border border-border font-medium"
+              >
+                Close Preview
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 bg-white dark:bg-zinc-900">
+              <iframe
+                title="Email Preview"
+                srcDoc={emailStatus.previewHtml}
+                className="w-full h-[500px] border-0 rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

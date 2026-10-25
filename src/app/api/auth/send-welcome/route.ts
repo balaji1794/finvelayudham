@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import nodemailer from 'nodemailer';
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +12,12 @@ export async function POST(req: Request) {
     const userName = name || 'Valued Member';
     const isRegister = type === 'welcome';
     const resendApiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.EMAIL_FROM || 'FinVelayudham <onboarding@resend.dev>';
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '465');
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    const fromEmail = process.env.EMAIL_FROM || (smtpUser ? `FinVelayudham <${smtpUser}>` : 'FinVelayudham <onboarding@resend.dev>');
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://finvelayudham.vercel.app';
 
     const emailSubject = isRegister
@@ -64,7 +70,7 @@ export async function POST(req: Request) {
     </div>
 
     <div style="text-align: center;">
-      <a href="${appUrl}/demo" class="button">Access My Wealth Dashboard</a>
+      <a href="${appUrl}/dashboard" class="button">Access My Wealth Vault</a>
     </div>
 
     <p style="font-size: 12px; color: #64748b; margin-top: 24px;">
@@ -82,40 +88,75 @@ export async function POST(req: Request) {
 </html>
     `;
 
-    // 1. Try sending via Resend API if API Key is configured in environment
+    // 1. Dispatch via Resend API if API Key is configured in environment
     if (resendApiKey) {
-      const resendRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: fromEmail,
-          to: [email],
-          subject: emailSubject,
-          html: emailHtml,
-        }),
-      });
-
-      if (resendRes.ok) {
-        const data = await resendRes.json();
-        return NextResponse.json({
-          success: true,
-          delivered: true,
-          provider: 'resend',
-          id: data.id,
-          message: `Confirmation email dispatched to ${email}`,
+      try {
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: fromEmail,
+            to: [email],
+            subject: emailSubject,
+            html: emailHtml,
+          }),
         });
-      } else {
-        const errText = await resendRes.text();
-        console.error('Resend API failed:', errText);
-        // Fall through to simulate/inform mode
+
+        if (resendRes.ok) {
+          const data = await resendRes.json();
+          return NextResponse.json({
+            success: true,
+            delivered: true,
+            provider: 'resend',
+            id: data.id,
+            message: `Confirmation email dispatched to ${email}`,
+          });
+        } else {
+          const errText = await resendRes.text();
+          console.error('Resend API call rejected:', errText);
+        }
+      } catch (err: any) {
+        console.error('Resend network error:', err);
       }
     }
 
-    // 2. Fallback / Configuration Guide Mode:
-    // When RESEND_API_KEY is not yet in Vercel environment variables
+    // 2. Dispatch via SMTP / Gmail if credentials configured
+    if (smtpUser && smtpPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+
+        const info = await transporter.sendMail({
+          from: fromEmail,
+          to: email,
+          subject: emailSubject,
+          html: emailHtml,
+        });
+
+        return NextResponse.json({
+          success: true,
+          delivered: true,
+          provider: 'smtp',
+          messageId: info.messageId,
+          message: `Confirmation email dispatched via SMTP to ${email}`,
+        });
+      } catch (err: any) {
+        console.error('SMTP transmission error:', err);
+      }
+    }
+
+    // 3. Informational / In-App Delivery Mode:
+    // When no external relay (Resend / SMTP) has been configured in Vercel environment variables yet
     console.log(
       `[FinVelayudham Auth] Prepared ${isRegister ? 'welcome' : 'login'} email for: ${email} (${userName})`
     );
@@ -125,7 +166,9 @@ export async function POST(req: Request) {
       delivered: false,
       simulated: true,
       emailSentTo: email,
-      message: `Account activated for ${email}. To deliver live emails to your external inbox, add your RESEND_API_KEY in Vercel Environment Variables.`,
+      subject: emailSubject,
+      previewHtml: emailHtml,
+      message: `Account activated for ${email}. To deliver live emails to your external Gmail inbox, please add RESEND_API_KEY or SMTP credentials in your Vercel Environment Variables.`,
     });
   } catch (error: any) {
     console.error('send-welcome API error:', error);
