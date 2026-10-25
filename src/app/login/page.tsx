@@ -13,6 +13,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const isRegisterParam = searchParams.get('mode') === 'register';
 
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+
   const [isRegister, setIsRegister] = useState(isRegisterParam);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,7 +53,7 @@ function LoginForm() {
         }
 
         setTimeout(() => {
-          router.push('/demo');
+          router.push(redirectUrl);
         }, 800);
       }
     } catch (err: any) {
@@ -74,11 +76,11 @@ function LoginForm() {
 
       setFeedback({
         type: 'success',
-        message: `Signed in with Google as ${targetEmail}! Redirecting to dashboard...`,
+        message: `Signed in with Google as ${targetEmail}! Unlocking secure vault...`,
       });
 
       setTimeout(() => {
-        router.push('/demo');
+        router.push(redirectUrl);
       }, 700);
     } catch (err: any) {
       setFeedback({

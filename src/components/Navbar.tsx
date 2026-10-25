@@ -66,13 +66,23 @@ export default function Navbar({
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-foreground/80">
-            <Link
-              href="/demo"
-              className="flex items-center gap-1.5 hover:text-primary transition-colors font-semibold text-primary"
-            >
-              <BarChart3 className="w-4 h-4" />
-              Live Demo
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 hover:text-primary transition-colors font-semibold text-primary"
+              >
+                <BarChart3 className="w-4 h-4" />
+                My Vault
+              </Link>
+            ) : (
+              <Link
+                href="/demo"
+                className="flex items-center gap-1.5 hover:text-primary transition-colors font-semibold text-primary"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Live Demo
+              </Link>
+            )}
             <Link
               href="/calculators"
               className="flex items-center gap-1.5 hover:text-primary transition-colors"
@@ -142,12 +152,20 @@ export default function Navbar({
 
                   <div className="py-1">
                     <Link
+                      href="/dashboard"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-xs text-foreground/80 hover:text-foreground hover:bg-muted transition-colors font-semibold"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                      <span>My Encrypted Vault</span>
+                    </Link>
+                    <Link
                       href="/demo"
                       onClick={() => setUserDropdownOpen(false)}
                       className="flex items-center gap-2 px-4 py-2 text-xs text-foreground/80 hover:text-foreground hover:bg-muted transition-colors"
                     >
-                      <BarChart3 className="w-3.5 h-3.5 text-primary" />
-                      <span>My Wealth Dashboard</span>
+                      <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span>Sample Demo Playground</span>
                     </Link>
                     <Link
                       href="/calculators"
@@ -238,14 +256,25 @@ export default function Navbar({
           )}
 
           <div className="flex flex-col space-y-3 text-base font-medium">
-            <Link
-              href="/demo"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 text-primary font-semibold py-2 px-3 rounded-md bg-primary/10"
-            >
-              <BarChart3 className="w-5 h-5" />
-              Live Demo
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 text-primary font-semibold py-2 px-3 rounded-md bg-primary/10"
+              >
+                <BarChart3 className="w-5 h-5" />
+                My Vault
+              </Link>
+            ) : (
+              <Link
+                href="/demo"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 text-primary font-semibold py-2 px-3 rounded-md bg-primary/10"
+              >
+                <BarChart3 className="w-5 h-5" />
+                Live Demo
+              </Link>
+            )}
             <Link
               href="/calculators"
               onClick={() => setMobileMenuOpen(false)}
