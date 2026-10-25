@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       let delivered = false;
       let deliveredTo = cleanEmail;
 
-      // Try Resend
+      // 1. Try Resend Direct
       if (resendApiKey) {
         try {
           const resendRes = await fetch('https://api.resend.com/emails', {
@@ -125,40 +125,14 @@ export async function POST(req: Request) {
 
           if (resendRes.ok) {
             delivered = true;
-          } else {
-            const errJson = await resendRes.json().catch(() => null);
-            if (errJson && errJson.message && errJson.message.includes('You can only send testing emails to your own email address')) {
-              const match = errJson.message.match(/\(([^)]+)\)/);
-              const allowedEmail = match ? match[1] : 'balajibuddy1794@gmail.com';
-              deliveredTo = allowedEmail;
-
-              await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${resendApiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  from: fromEmail,
-                  to: [allowedEmail],
-                  subject: `[Sandbox Relay for ${cleanEmail}] ${emailSubject}`,
-                  html: `
-                    <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-family: sans-serif; font-size: 12px; color: #92400e;">
-                      <strong>Resend Testing Mode Relay:</strong> Verification code generated for <strong>${cleanEmail}</strong> (${userName}). Delivered to verified owner (<strong>${allowedEmail}</strong>).
-                    </div>
-                    ${emailHtml}
-                  `,
-                }),
-              });
-              delivered = true;
-            }
+            deliveredTo = cleanEmail;
           }
         } catch (err) {
           console.error('Resend verify dispatch error:', err);
         }
       }
 
-      // Try SMTP
+      // 2. If not delivered and SMTP is configured, send via SMTP directly to the actual recipient
       if (!delivered && smtpUser && smtpPass) {
         try {
           const transporter = nodemailer.createTransport({
@@ -169,15 +143,46 @@ export async function POST(req: Request) {
           });
 
           await transporter.sendMail({
-            from: fromEmail,
+            from: smtpUser ? `FinVelayudham <${smtpUser}>` : fromEmail,
             to: cleanEmail,
             subject: emailSubject,
             html: emailHtml,
           });
           delivered = true;
           deliveredTo = cleanEmail;
+          console.log(`[FinVelayudham Auth] Verification code successfully delivered to ${cleanEmail} via SMTP`);
         } catch (err) {
           console.error('SMTP verify dispatch error:', err);
+        }
+      }
+
+      // 3. Fallback: If still not delivered and Resend is available in sandbox mode, relay to the account owner
+      if (!delivered && resendApiKey) {
+        try {
+          const allowedEmail = 'balajibuddy1794@gmail.com';
+          deliveredTo = allowedEmail;
+
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: fromEmail,
+              to: [allowedEmail],
+              subject: `[Sandbox Relay for ${cleanEmail}] ${emailSubject}`,
+              html: `
+                <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-family: sans-serif; font-size: 12px; color: #92400e;">
+                  <strong>Resend Testing Mode Relay:</strong> Verification code generated for <strong>${cleanEmail}</strong> (${userName}). Delivered to verified owner (<strong>${allowedEmail}</strong>).
+                </div>
+                ${emailHtml}
+              `,
+            }),
+          });
+          delivered = true;
+        } catch (relayErr) {
+          console.error('Resend sandbox relay error:', relayErr);
         }
       }
 

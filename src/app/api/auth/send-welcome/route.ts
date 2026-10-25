@@ -120,6 +120,35 @@ export async function POST(req: Request) {
         const errJson = await resendRes.json().catch(() => null);
         console.error('Resend API error:', errJson);
 
+        // If SMTP credentials are configured, try sending directly to the recipient via SMTP
+        if (smtpUser && smtpPass) {
+          try {
+            const transporter = nodemailer.createTransport({
+              host: smtpHost,
+              port: smtpPort,
+              secure: smtpPort === 465,
+              auth: { user: smtpUser, pass: smtpPass },
+            });
+
+            const smtpInfo = await transporter.sendMail({
+              from: smtpUser ? `FinVelayudham <${smtpUser}>` : fromEmail,
+              to: email,
+              subject: emailSubject,
+              html: emailHtml,
+            });
+
+            return NextResponse.json({
+              success: true,
+              delivered: true,
+              provider: 'smtp',
+              id: smtpInfo.messageId,
+              message: `Welcome email delivered directly to ${email} via SMTP`,
+            });
+          } catch (smtpErr) {
+            console.error('SMTP fallback failed:', smtpErr);
+          }
+        }
+
         if (errJson && errJson.message && errJson.message.includes('You can only send testing emails to your own email address')) {
           const match = errJson.message.match(/\(([^)]+)\)/);
           const allowedEmail = match ? match[1] : 'balajibuddy1794@gmail.com';
