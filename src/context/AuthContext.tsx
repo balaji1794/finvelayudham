@@ -174,8 +174,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (email: string, name: string, password?: string) => {
-    // Legacy direct register
-    return login(email, name, password);
+    const cleanEmail = email.trim().toLowerCase();
+    const displayName = name && name.trim() ? name.trim() : deriveNameFromEmail(cleanEmail);
+    const sessionUser: User = {
+      id: 'usr_' + Math.random().toString(36).substring(2, 9),
+      email: cleanEmail,
+      name: displayName,
+      createdAt: new Date().toISOString(),
+      isVerified: true,
+    };
+
+    setUser(sessionUser);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
+      document.cookie = `finvelayudham_session=${encodeURIComponent(sessionUser.email)}; path=/; max-age=2592000; SameSite=Lax`;
+    } catch (err) {
+      console.warn('Could not persist session:', err);
+    }
+
+    // Trigger confirmation / welcome email dispatch in the background
+    requestVerification(cleanEmail, displayName).catch(() => {});
+    dispatchWelcomeEmail(cleanEmail, displayName, 'welcome').catch(() => {});
+
+    return {
+      success: true,
+      emailSent: true,
+      user: sessionUser,
+    };
   };
 
   const loginWithGoogle = async (customEmail?: string, customName?: string) => {
