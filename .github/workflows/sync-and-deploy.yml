@@ -1,0 +1,50 @@
+name: FinVelayudham Sync & CI/CD Pipeline
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  validate-and-sync:
+    name: Check Parity, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Automated Test Suite
+        run: npm test
+
+      - name: Run Upstream Parity & Drift Check
+        run: npm run sync:check
+        env:
+          REFERENCE_URL: https://www.finboom.app
+          TARGET_URL: https://www.finvelayudham.app
+
+      - name: Build Next.js Production Application
+        run: npm run build
+
+      - name: Post-Build Health Check
+        run: |
+          echo "Build successful. Verifying output assets..."
+          test -d .next
+          echo "Health check passed."
+
+      - name: Notify on Drift or Failure
+        if: failure()
+        run: |
+          echo "::error ::FinVelayudham sync pipeline failed or upstream drift detected!"
