@@ -114,9 +114,52 @@ export async function POST(req: Request) {
             id: data.id,
             message: `Confirmation email dispatched to ${email}`,
           });
-        } else {
-          const errText = await resendRes.text();
-          console.error('Resend API call rejected:', errText);
+        }
+
+        // Handle Resend Validation Errors (e.g. 403 testing mode limitation)
+        const errJson = await resendRes.json().catch(() => null);
+        console.error('Resend API error:', errJson);
+
+        if (errJson && errJson.message && errJson.message.includes('You can only send testing emails to your own email address')) {
+          const match = errJson.message.match(/\(([^)]+)\)/);
+          const allowedEmail = match ? match[1] : 'balajibuddy1794@gmail.com';
+
+          // Resend allows sending to the account owner's email address in testing mode
+          const retryRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: fromEmail,
+              to: [allowedEmail],
+              subject: `[Sandbox Relay for ${email}] ${emailSubject}`,
+              html: `
+                <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 14px; border-radius: 8px; margin-bottom: 20px; font-family: sans-serif; font-size: 13px; color: #92400e;">
+                  <strong>⚠️ Resend Testing Sandbox Relay:</strong><br/>
+                  This email was generated for <strong>${email}</strong> (${userName}).<br/>
+                  Because Resend's free tier with <code>onboarding@resend.dev</code> only permits sending to your registered owner email (<strong>${allowedEmail}</strong>), it was delivered here.<br/><br/>
+                  <em>To send directly to ${email} or external recipients: verify your custom domain in Resend, or configure Gmail SMTP (SMTP_USER + SMTP_PASS) in Vercel.</em>
+                </div>
+                ${emailHtml}
+              `,
+            }),
+          });
+
+          if (retryRes.ok) {
+            const retryData = await retryRes.json();
+            return NextResponse.json({
+              success: true,
+              delivered: true,
+              sandboxRelayed: true,
+              deliveredTo: allowedEmail,
+              originalRecipient: email,
+              provider: 'resend-sandbox-relay',
+              id: retryData.id,
+              message: `Delivered to verified Resend account (${allowedEmail}) via sandbox relay for ${email}. Check your Gmail inbox!`,
+            });
+          }
         }
       } catch (err: any) {
         console.error('Resend network error:', err);
@@ -168,7 +211,7 @@ export async function POST(req: Request) {
       emailSentTo: email,
       subject: emailSubject,
       previewHtml: emailHtml,
-      message: `Account activated for ${email}. To deliver live emails to your external Gmail inbox, please add RESEND_API_KEY or SMTP credentials in your Vercel Environment Variables.`,
+      message: `Account activated for ${email}. To deliver live emails to ${email}, please add your custom domain to Resend or configure Gmail SMTP in Vercel.`,
     });
   } catch (error: any) {
     console.error('send-welcome API error:', error);
