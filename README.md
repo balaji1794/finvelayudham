@@ -1,7 +1,7 @@
 # FinVelayudham.app 🚀
 
 **Production-grade Personal Wealth & Financial Independence Platform**  
-*Built for functional and visual parity with reference application [FinBoom](https://www.finboom.app/), configured for [finvelayudham.app](https://www.finvelayudham.app/).*
+*100% Free & Unlimited for all users. No subscriptions, no paywalls, no limits.*
 
 ---
 
