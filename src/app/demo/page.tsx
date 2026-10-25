@@ -36,8 +36,10 @@ import {
   Transaction
 } from '@/lib/mock-data';
 import { formatCurrency, convertAmount } from '@/lib/currencies';
+import { useAuth } from '@/context/AuthContext';
 
 export default function DemoPage() {
+  const { user } = useAuth();
   const [currency, setCurrency] = useState('INR');
   const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'liabilities' | 'cashflow' | 'essentials'>('overview');
 
@@ -146,12 +148,20 @@ export default function DemoPage() {
       {/* Demo Top Banner */}
       <div className="bg-primary/10 border-b border-primary/20 py-2.5 px-4 text-center text-xs font-medium text-foreground flex items-center justify-center gap-2">
         <Sparkles className="w-3.5 h-3.5 text-primary" />
-        <span>
-          <strong>Live Interactive Demo:</strong> All calculations, conversions, and add/delete actions work in real-time in your browser.
-        </span>
-        <Link href="/login?mode=register" className="ml-2 font-semibold text-primary underline hover:text-primary/80">
-          Save my portfolio →
-        </Link>
+        {user ? (
+          <span>
+            Logged in as <strong>{user.name}</strong> ({user.email}) · <strong>100% Free & Unlimited</strong> Portfolio Active.
+          </span>
+        ) : (
+          <>
+            <span>
+              <strong>Live Interactive Demo:</strong> All calculations, conversions, and add/delete actions work in real-time in your browser.
+            </span>
+            <Link href="/login?mode=register" className="ml-2 font-semibold text-primary underline hover:text-primary/80">
+              Save my portfolio →
+            </Link>
+          </>
+        )}
       </div>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -159,10 +169,10 @@ export default function DemoPage() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="font-serif text-3xl font-bold text-foreground">
-              Portfolio Overview
+              {user ? `${user.name}'s Wealth Dashboard` : 'Portfolio Overview'}
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Consolidated wealth dashboard across 20+ asset classes
+              Consolidated wealth dashboard across 20+ asset classes · Zero bank logins required
             </p>
           </div>
 

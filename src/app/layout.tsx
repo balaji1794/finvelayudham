@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import Providers from '@/components/Providers';
 
 export const metadata: Metadata = {
   title: 'FinVelayudham · All your money, in one place',
@@ -50,7 +51,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#2c6e49" />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
