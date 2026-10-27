@@ -21,10 +21,16 @@ import {
   Settings as SettingsIcon,
   Upload,
   Coins,
+  TrendingUp,
+  Wallet,
+  ShieldCheck,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import CurrencySelector from './CurrencySelector';
 import { useAuth } from '@/context/AuthContext';
+import { usePrivacy } from '@/context/PrivacyContext';
 
 interface NavbarProps {
   currentCurrency?: string;
@@ -41,6 +47,7 @@ export default function Navbar({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { user, logout } = useAuth();
+  const { isPrivacyMasked, togglePrivacyMask } = usePrivacy();
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -86,57 +93,59 @@ export default function Navbar({
                   }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
-                  Dashboard
+                  Overview
                 </Link>
 
                 <Link
-                  href="/assets"
+                  href="/wealth"
                   className={`flex items-center gap-1.5 transition-colors ${
-                    isActive('/assets') ? 'text-primary font-bold' : 'hover:text-primary'
+                    isActive('/wealth') || isActive('/assets') || isActive('/allocation') || isActive('/snapshots')
+                      ? 'text-primary font-bold'
+                      : 'hover:text-primary'
                   }`}
                 >
-                  <Coins className="w-3.5 h-3.5" />
-                  Assets
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  Wealth
                 </Link>
 
                 <Link
-                  href="/liabilities"
+                  href="/money"
                   className={`flex items-center gap-1.5 transition-colors ${
-                    isActive('/liabilities') ? 'text-primary font-bold' : 'hover:text-primary'
+                    isActive('/money') ? 'text-primary font-bold' : 'hover:text-primary'
                   }`}
                 >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  Liabilities
+                  <Wallet className="w-3.5 h-3.5" />
+                  Money
                 </Link>
 
                 <Link
-                  href="/goals"
+                  href="/essentials"
                   className={`flex items-center gap-1.5 transition-colors ${
-                    isActive('/goals') ? 'text-primary font-bold' : 'hover:text-primary'
+                    isActive('/essentials') || isActive('/goals') ? 'text-primary font-bold' : 'hover:text-primary'
                   }`}
                 >
-                  <Target className="w-3.5 h-3.5" />
-                  Goals
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Essentials
                 </Link>
 
                 <Link
-                  href="/snapshots"
+                  href="/calculators"
                   className={`flex items-center gap-1.5 transition-colors ${
-                    isActive('/snapshots') ? 'text-primary font-bold' : 'hover:text-primary'
+                    isActive('/calculators') ? 'text-primary font-bold' : 'hover:text-primary'
                   }`}
                 >
-                  <Camera className="w-3.5 h-3.5" />
-                  Snapshots
+                  <Calculator className="w-3.5 h-3.5" />
+                  Calculators
                 </Link>
 
                 <Link
-                  href="/allocation"
+                  href="/import"
                   className={`flex items-center gap-1.5 transition-colors ${
-                    isActive('/allocation') ? 'text-primary font-bold' : 'hover:text-primary'
+                    isActive('/import') ? 'text-primary font-bold' : 'hover:text-primary'
                   }`}
                 >
-                  <Sliders className="w-3.5 h-3.5" />
-                  Allocation
+                  <Upload className="w-3.5 h-3.5" />
+                  Import
                 </Link>
               </>
             ) : (
@@ -168,6 +177,21 @@ export default function Navbar({
             onCurrencyChange={onCurrencyChange}
           />
           <ThemeToggle />
+
+          {/* Privacy Mask Toggle */}
+          <button
+            type="button"
+            onClick={togglePrivacyMask}
+            title={isPrivacyMasked ? 'Reveal financial numbers' : 'Hide financial numbers (Privacy Mode)'}
+            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+              isPrivacyMasked
+                ? 'bg-primary/10 border-primary/30 text-primary'
+                : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+            aria-label="Toggle privacy mask"
+          >
+            {isPrivacyMasked ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
 
           <div className="h-4 w-px bg-border mx-1" />
 
