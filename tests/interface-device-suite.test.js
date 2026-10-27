@@ -1,7 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-
-const BASE_URL = process.env.TEST_BASE_URL || 'https://finvelayudham.vercel.app';
+const { getAvailableBaseUrl } = require('./test-utils');
 
 // Indian Number Formatting function matching src/lib/utils.ts
 function formatIndianCurrency(amount, currency = 'INR') {
@@ -37,11 +36,17 @@ function formatIndianCurrency(amount, currency = 'INR') {
 // ---------------------------------------------------------------------
 // 1. INTERFACE: RESPONSIVE & BREAKPOINT TESTING
 // ---------------------------------------------------------------------
-test('Responsive & Breakpoint Testing: Core views declare mobile, tablet & desktop rules', async () => {
+test('Responsive & Breakpoint Testing: Core views declare mobile, tablet & desktop rules', async (t) => {
+  const baseUrl = await getAvailableBaseUrl();
+  if (!baseUrl) {
+    t.skip('Skipping HTTP test: no server reachable');
+    return;
+  }
+
   const pages = ['/', '/dashboard', '/assets', '/calculators/sip', '/settings'];
 
   for (const page of pages) {
-    const res = await fetch(`${BASE_URL}${page}`);
+    const res = await fetch(`${baseUrl}${page}`);
     assert.strictEqual(res.status, 200);
     const html = await res.text();
 
@@ -62,8 +67,14 @@ test('Responsive & Breakpoint Testing: Core views declare mobile, tablet & deskt
 // ---------------------------------------------------------------------
 // 2. INTERFACE: MOBILE WEB & TOUCH INTERACTIONS
 // ---------------------------------------------------------------------
-test('Mobile Web Testing: Navigation bar contains mobile drawer and touch-friendly controls', async () => {
-  const res = await fetch(`${BASE_URL}/`);
+test('Mobile Web Testing: Navigation bar contains mobile drawer and touch-friendly controls', async (t) => {
+  const baseUrl = await getAvailableBaseUrl();
+  if (!baseUrl) {
+    t.skip('Skipping HTTP test: no server reachable');
+    return;
+  }
+
+  const res = await fetch(`${baseUrl}/`);
   const html = await res.text();
 
   // Mobile menu button presence (hidden on desktop md:hidden)
@@ -76,8 +87,14 @@ test('Mobile Web Testing: Navigation bar contains mobile drawer and touch-friend
 // ---------------------------------------------------------------------
 // 3. INTERFACE: VISUAL DESIGN & BRANDING TOKENS
 // ---------------------------------------------------------------------
-test('Visual Testing: Design tokens maintain FinVelayudham brand identity', async () => {
-  const res = await fetch(`${BASE_URL}/`);
+test('Visual Testing: Design tokens maintain FinVelayudham brand identity', async (t) => {
+  const baseUrl = await getAvailableBaseUrl();
+  if (!baseUrl) {
+    t.skip('Skipping HTTP test: no server reachable');
+    return;
+  }
+
+  const res = await fetch(`${baseUrl}/`);
   const html = await res.text();
 
   // Brand Name

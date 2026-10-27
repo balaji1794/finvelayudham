@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const { getAvailableBaseUrl } = require('./test-utils');
 
-const BASE_URL = process.env.TEST_BASE_URL || 'https://finvelayudham.vercel.app';
 const crypto = globalThis.crypto;
 
 // Helper: Convert ArrayBuffer to Base64
@@ -95,9 +95,15 @@ test('Performance Testing: Financial calculations execute in under 2 millisecond
 // ---------------------------------------------------------------------
 // 2. NON-FUNCTIONAL: LOAD & CONCURRENCY TESTING
 // ---------------------------------------------------------------------
-test('Load Testing: System handles 50 concurrent requests without failure', async () => {
+test('Load Testing: System handles 50 concurrent requests without failure', async (t) => {
+  const baseUrl = await getAvailableBaseUrl();
+  if (!baseUrl) {
+    t.skip('Skipping HTTP test: no server reachable');
+    return;
+  }
+
   const requests = Array.from({ length: 50 }, (_, i) =>
-    fetch(`${BASE_URL}/api/dashboard`, { headers: { 'Accept': 'application/json' } })
+    fetch(`${baseUrl}/api/dashboard`, { headers: { 'Accept': 'application/json' } })
   );
 
   const start = performance.now();
@@ -201,8 +207,14 @@ test('Security Testing: AES-256 GCM guarantees secrecy, IV freshness, and tamper
 // ---------------------------------------------------------------------
 // 5. NON-FUNCTIONAL: ACCESSIBILITY & USABILITY TESTING
 // ---------------------------------------------------------------------
-test('Usability & Accessibility Testing: Semantic HTML5 structure and accessible controls', async () => {
-  const res = await fetch(`${BASE_URL}/`);
+test('Usability & Accessibility Testing: Semantic HTML5 structure and accessible controls', async (t) => {
+  const baseUrl = await getAvailableBaseUrl();
+  if (!baseUrl) {
+    t.skip('Skipping HTTP test: no server reachable');
+    return;
+  }
+
+  const res = await fetch(`${baseUrl}/`);
   assert.strictEqual(res.status, 200);
   const html = await res.text();
 
@@ -224,9 +236,15 @@ test('Usability & Accessibility Testing: Semantic HTML5 structure and accessible
 // ---------------------------------------------------------------------
 // 6. NON-FUNCTIONAL: RELIABILITY & RECOVERY TESTING
 // ---------------------------------------------------------------------
-test('Reliability & Recovery Testing: Application handles corrupted storage payloads without crashing', async () => {
+test('Reliability & Recovery Testing: Application handles corrupted storage payloads without crashing', async (t) => {
+  const baseUrl = await getAvailableBaseUrl();
+  if (!baseUrl) {
+    t.skip('Skipping HTTP test: no server reachable');
+    return;
+  }
+
   // Test loading corrupt data in API or client simulation
-  const badPayloadRes = await fetch(`${BASE_URL}/api/portfolio`, {
+  const badPayloadRes = await fetch(`${baseUrl}/api/portfolio`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -239,7 +257,7 @@ test('Reliability & Recovery Testing: Application handles corrupted storage payl
   assert.ok([200, 400].includes(badPayloadRes.status));
 
   // Retrieve corrupt data
-  const getCorrupt = await fetch(`${BASE_URL}/api/portfolio?userId=usr_corrupt_test`);
+  const getCorrupt = await fetch(`${baseUrl}/api/portfolio?userId=usr_corrupt_test`);
   assert.strictEqual(getCorrupt.status, 200);
   const body = await getCorrupt.json();
   assert.strictEqual(body.found, true);

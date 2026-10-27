@@ -26,11 +26,18 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Automated Test Suite
-        run: npm test
-
       - name: Build Next.js Production Application
         run: npm run build
+
+      - name: Start Next.js Test Server
+        run: |
+          npx next start -p 3005 &
+          sleep 4
+
+      - name: Run Automated Test Suite
+        run: npm test
+        env:
+          TEST_BASE_URL: http://127.0.0.1:3005
 
       - name: Run Upstream Drift Check (Non-blocking)
         run: npm run sync:check || echo "Upstream sync check completed with warnings"
