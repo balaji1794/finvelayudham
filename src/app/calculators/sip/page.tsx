@@ -10,6 +10,7 @@ export default function SipCalculatorPage() {
   const [rate, setRate] = useState(12);
   const [years, setYears] = useState(10);
   const [stepUp, setStepUp] = useState(0);
+  const [waitYears, setWaitYears] = useState(5);
 
   const res = calculateSIP(monthly, rate, years, 0, stepUp);
 
@@ -18,6 +19,21 @@ export default function SipCalculatorPage() {
   const returns = res.estimatedReturns;
   const invPercent = total > 0 ? (invested / total) * 100 : 0;
   const retPercent = total > 0 ? (returns / total) * 100 : 0;
+
+  // Real-time "What if you wait?" calculations
+  const effectiveWait = Math.max(1, Math.min(years - 1, waitYears));
+  const remainingYears = Math.max(1, years - effectiveWait);
+  const lateRes = calculateSIP(monthly, rate, remainingYears, 0, stepUp);
+  const waitCost = Math.max(0, total - lateRes.totalValue);
+
+  // Catch up monthly requirement
+  const remainingMonths = remainingYears * 12;
+  const monthlyRate = rate / 100 / 12;
+  const factor = ((Math.pow(1 + monthlyRate, remainingMonths) - 1) / monthlyRate) * (1 + monthlyRate);
+  const catchUpMonthly = factor > 0 ? Math.round(total / factor) : monthly;
+
+  // Late start with 10% annual step-up
+  const lateWithStepUp = calculateSIP(monthly, rate, remainingYears, 0, 10);
 
   return (
     <CalculatorLayout
@@ -155,14 +171,54 @@ export default function SipCalculatorPage() {
             </div>
           </div>
 
-          {/* Wait analysis */}
-          {res.waitAnalysis && years > 3 && (
-            <div className="mt-6 pt-4 border-t border-border/80 text-xs text-muted-foreground leading-relaxed bg-card p-3 rounded-lg">
-              <strong className="text-foreground">What if you wait?</strong> Starting {res.waitAnalysis.waitYears} years later reduces your ending wealth to{' '}
-              <span className="font-semibold text-foreground">{formatCurrency(res.waitAnalysis.reducedValue, 'INR')}</span>. Waiting costs{' '}
-              <span className="font-semibold text-destructive">{formatCurrency(res.waitAnalysis.waitCost, 'INR')}</span>. To catch up, you would need to invest{' '}
-              <span className="font-semibold text-foreground">{formatCurrency(res.waitAnalysis.catchUpMonthly, 'INR')}</span> every month instead of{' '}
-              {formatCurrency(monthly, 'INR')}.
+          {/* What if you wait? Interactive delay cost widget */}
+          {years > 1 && (
+            <div className="mt-6 pt-4 border-t border-border/80 bg-card/80 border border-border rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-serif font-bold text-foreground">
+                  What if you wait?
+                </span>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">Start later by</span>
+                  <div className="flex items-center bg-muted/80 border border-border rounded px-2 py-0.5 font-mono">
+                    <input
+                      type="number"
+                      min="1"
+                      max={Math.max(1, years - 1)}
+                      value={waitYears}
+                      onChange={(e) => setWaitYears(Math.max(1, Math.min(years - 1, Number(e.target.value) || 1)))}
+                      className="w-8 bg-transparent text-xs font-bold text-foreground text-center focus:outline-none"
+                    />
+                    <span className="text-[11px] text-muted-foreground ml-0.5">yrs</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <input
+                  type="range"
+                  min="1"
+                  max={Math.max(1, years - 1)}
+                  step="1"
+                  value={effectiveWait}
+                  onChange={(e) => setWaitYears(Number(e.target.value))}
+                  className="w-full accent-primary cursor-pointer h-1.5"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-xs text-muted-foreground leading-relaxed">
+                <p>
+                  Start <strong className="text-foreground">{effectiveWait} years later</strong> and stop on the same date, and you end with{' '}
+                  <strong className="text-foreground font-mono">{formatCurrency(lateRes.totalValue, 'INR')}</strong>. Waiting costs{' '}
+                  <strong className="text-destructive font-mono">{formatCurrency(waitCost, 'INR')}</strong>.
+                </p>
+                <p>
+                  To catch up, the late start needs <strong className="text-primary font-mono">{formatCurrency(catchUpMonthly, 'INR')}</strong> a month instead of {formatCurrency(monthly, 'INR')}.
+                </p>
+                <p>
+                  A 10% yearly step-up would lift the late start to <strong className="text-foreground font-mono">{formatCurrency(lateWithStepUp.totalValue, 'INR')}</strong>.
+                </p>
+              </div>
             </div>
           )}
         </div>

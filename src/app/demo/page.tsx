@@ -38,6 +38,75 @@ import {
 import { formatCurrency, convertAmount } from '@/lib/currencies';
 import { useAuth } from '@/context/AuthContext';
 
+const ZERODHA_SAMPLE_HOLDINGS: Asset[] = [
+  {
+    id: 'z-hdfc',
+    name: 'HDFC Bank Ltd',
+    productType: 'Stock (Equity)',
+    category: 'EQUITY',
+    subClass: 'Large Cap Banking',
+    currentValue: 175000,
+    investedAmount: 145000,
+    currentCurrency: 'INR',
+    geographyTag: 'DOMESTIC',
+  },
+  {
+    id: 'z-ril',
+    name: 'Reliance Industries Ltd',
+    productType: 'Stock (Equity)',
+    category: 'EQUITY',
+    subClass: 'Energy & Conglomerate',
+    currentValue: 240000,
+    investedAmount: 200000,
+    currentCurrency: 'INR',
+    geographyTag: 'DOMESTIC',
+  },
+  {
+    id: 'z-tcs',
+    name: 'Tata Consultancy Services',
+    productType: 'Stock (Equity)',
+    category: 'EQUITY',
+    subClass: 'IT & Software',
+    currentValue: 160000,
+    investedAmount: 130000,
+    currentCurrency: 'INR',
+    geographyTag: 'DOMESTIC',
+  },
+  {
+    id: 'z-infy',
+    name: 'Infosys Ltd',
+    productType: 'Stock (Equity)',
+    category: 'EQUITY',
+    subClass: 'IT & Software',
+    currentValue: 120000,
+    investedAmount: 105000,
+    currentCurrency: 'INR',
+    geographyTag: 'DOMESTIC',
+  },
+  {
+    id: 'z-tatamotors',
+    name: 'Tata Motors Ltd',
+    productType: 'Stock (Equity)',
+    category: 'EQUITY',
+    subClass: 'Auto & EV',
+    currentValue: 95000,
+    investedAmount: 70000,
+    currentCurrency: 'INR',
+    geographyTag: 'DOMESTIC',
+  },
+  {
+    id: 'z-itc',
+    name: 'ITC Ltd',
+    productType: 'Stock (Equity)',
+    category: 'EQUITY',
+    subClass: 'FMCG & Dividends',
+    currentValue: 85000,
+    investedAmount: 65000,
+    currentCurrency: 'INR',
+    geographyTag: 'DOMESTIC',
+  },
+];
+
 export default function DemoPage() {
   const { user } = useAuth();
   const [currency, setCurrency] = useState('INR');
@@ -55,6 +124,65 @@ export default function DemoPage() {
   // Modal open states
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
   const [isAddLiabilityOpen, setIsAddLiabilityOpen] = useState(false);
+
+  // Interactive Demo Controls State
+  const [toastMessage, setToastMessage] = useState('');
+  const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [inlineName, setInlineName] = useState('');
+  const [inlineValue, setInlineValue] = useState('');
+  const [inlineType, setInlineType] = useState('Mutual Fund');
+
+  const handleImportZerodha = () => {
+    const existingIds = new Set(assets.map((a) => a.id));
+    const newItems = ZERODHA_SAMPLE_HOLDINGS.filter((h) => !existingIds.has(h.id));
+    if (newItems.length === 0) {
+      setToastMessage('Zerodha sample holdings are already imported into the demo.');
+    } else {
+      setAssets((prev) => [...newItems, ...prev]);
+      setToastMessage(`✓ Imported ${newItems.length} equity holdings from Zerodha Console into your live demo.`);
+    }
+    setTimeout(() => setToastMessage(''), 4500);
+  };
+
+  const handleResetDemo = () => {
+    setAssets(INITIAL_ASSETS);
+    setLiabilities(INITIAL_LIABILITIES);
+    setTransactions(INITIAL_TRANSACTIONS);
+    setToastMessage('✓ Demo portfolio reset to baseline sample data.');
+    setTimeout(() => setToastMessage(''), 3500);
+  };
+
+  const handleInlineAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inlineName.trim() || !inlineValue) return;
+
+    let category: 'EQUITY' | 'DEBT' | 'COMMODITY' | 'REAL_ESTATE' | 'CASH' | 'CRYPTO' = 'EQUITY';
+    if (inlineType === 'Gold') category = 'COMMODITY';
+    else if (inlineType === 'Fixed Deposit') category = 'DEBT';
+    else if (inlineType === 'Real Estate') category = 'REAL_ESTATE';
+    else if (inlineType === 'Crypto') category = 'CRYPTO';
+
+    const numVal = Math.max(0, parseFloat(inlineValue) || 0);
+
+    const newAsset: Asset = {
+      id: `inline-${Date.now()}`,
+      name: inlineName.trim(),
+      productType: inlineType,
+      category,
+      subClass: inlineType,
+      currentValue: numVal,
+      investedAmount: numVal,
+      currentCurrency: currency,
+      geographyTag: 'DOMESTIC',
+    };
+
+    setAssets((prev) => [newAsset, ...prev]);
+    setInlineName('');
+    setInlineValue('');
+    setShowInlineAdd(false);
+    setToastMessage(`✓ Added "${newAsset.name}" to your demo holdings.`);
+    setTimeout(() => setToastMessage(''), 3500);
+  };
 
   // Calculations
   const totalAssets = useMemo(() => {
@@ -193,6 +321,119 @@ export default function DemoPage() {
             </button>
           </div>
         </div>
+
+        {/* FinBoom-style Interactive Demo Action Bar */}
+        <div className="bg-card border border-border rounded-xl p-3.5 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleImportZerodha}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-medium text-foreground hover:bg-muted active:scale-95 transition-all cursor-pointer shadow-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+              Import from Zerodha
+            </button>
+
+            <button
+              onClick={() => setShowInlineAdd(!showInlineAdd)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-medium text-foreground hover:bg-muted active:scale-95 transition-all cursor-pointer shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5 text-primary" />
+              Add asset
+            </button>
+
+            <button
+              onClick={handleResetDemo}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all cursor-pointer shadow-xs"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Reset
+            </button>
+          </div>
+
+          <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <strong className="text-foreground">{assets.length}</strong> holdings · sample data (100% Free)
+          </div>
+        </div>
+
+        {/* Toast Feedback Banner */}
+        {toastMessage && (
+          <div className="mb-6 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+            <span>{toastMessage}</span>
+            <button onClick={() => setToastMessage('')} className="text-xs opacity-60 hover:opacity-100">✕</button>
+          </div>
+        )}
+
+        {/* Inline Asset Add Drawer (Identical to FinBoom) */}
+        {showInlineAdd && (
+          <form
+            onSubmit={handleInlineAddSubmit}
+            className="bg-card border border-primary/30 rounded-xl p-4 mb-6 shadow-md grid grid-cols-1 sm:grid-cols-4 gap-3 items-end animate-in fade-in"
+          >
+            <div>
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                Name
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. SBI Bluechip"
+                value={inlineName}
+                onChange={(e) => setInlineName(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                Value ({currency})
+              </label>
+              <input
+                type="number"
+                required
+                min="0"
+                placeholder="100000"
+                value={inlineValue}
+                onChange={(e) => setInlineValue(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                Type
+              </label>
+              <select
+                value={inlineType}
+                onChange={(e) => setInlineType(e.target.value)}
+                className="w-full h-9 px-2.5 rounded-lg border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              >
+                <option value="Mutual Fund">Mutual Fund</option>
+                <option value="Stock">Stock</option>
+                <option value="Gold">Gold</option>
+                <option value="Fixed Deposit">Fixed Deposit</option>
+                <option value="Real Estate">Real Estate</option>
+                <option value="Crypto">Crypto</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                className="flex-1 h-9 rounded-lg bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowInlineAdd(false)}
+                className="h-9 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* 4 Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
