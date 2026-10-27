@@ -61,8 +61,9 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors">
       <Navbar currentCurrency={currency} onCurrencyChange={setCurrency} />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-32 border-b border-border/50">
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-32 border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 animate-pulse">
@@ -465,6 +466,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </main>
 
       <Footer />
     </div>
