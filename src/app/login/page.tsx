@@ -9,8 +9,8 @@ import { useAuth } from '@/context/AuthContext';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isRegisterParam = searchParams.get('mode') === 'register';
-  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const isRegisterParam = searchParams ? searchParams.get('mode') === 'register' : false;
+  const redirectUrl = (searchParams && searchParams.get('redirect')) || '/dashboard';
 
   const [mode, setMode] = useState<'login' | 'register'>(
     isRegisterParam ? 'register' : 'login'

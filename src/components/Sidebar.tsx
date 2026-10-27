@@ -62,11 +62,12 @@ export default function Sidebar({
   }, []);
 
   const isActive = (path: string) => {
+    if (!pathname) return false;
     if (path === '/dashboard') return pathname === '/dashboard';
     if (path === '/wealth') return pathname === '/wealth' || pathname === '/assets' || pathname === '/allocation' || pathname === '/snapshots';
     if (path === '/money') return pathname === '/money' || pathname === '/cashflow';
     if (path === '/essentials') return pathname === '/essentials' || pathname === '/goals';
-    return pathname.startsWith(path);
+    return typeof pathname.startsWith === 'function' ? pathname.startsWith(path) : false;
   };
 
   const handleInstallApp = () => {

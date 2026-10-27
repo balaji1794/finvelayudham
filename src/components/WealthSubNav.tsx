@@ -21,7 +21,7 @@ export default function WealthSubNav() {
           aria-label="Section navigation"
         >
           {links.map((tab) => {
-            const isActive = pathname === tab.href;
+            const isActive = Boolean(pathname && pathname === tab.href);
             return (
               <Link
                 key={tab.href}

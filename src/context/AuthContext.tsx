@@ -172,8 +172,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       setUser(sessionUser);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
-      document.cookie = `finvelayudham_session=${encodeURIComponent(sessionUser.email)}; path=/; max-age=2592000; SameSite=Lax`;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
+        document.cookie = `finvelayudham_session=${encodeURIComponent(sessionUser.email)}; path=/; max-age=2592000; SameSite=Lax`;
+      } catch (err) {
+        console.warn('Could not persist session:', err);
+      }
 
       // Trigger welcome email
       dispatchWelcomeEmail(cleanEmail, displayName, 'welcome').catch(() => {});
