@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 // Server-side persistent storage mapped per user ID and email
 // In production with Supabase/PostgreSQL, this points to encrypted table rows
 const userVaultStore = new Map<string, { userId: string; email: string; payload: string; updatedAt: string }>();

@@ -275,24 +275,11 @@ export default function SnapshotsPage() {
 
         {/* Historical Interactive Chart */}
         {snapshots.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-foreground">
-                  Net Worth Growth Curve
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Track compounding returns and debt reduction over time
-                </p>
-              </div>
-              <span className="text-xs font-mono text-muted-foreground">
-                Base: {currency}
-              </span>
-            </div>
-            <div className="h-72 w-full">
-              <InteractiveAreaChart snapshots={snapshots} currency={currency} />
-            </div>
-          </div>
+          <InteractiveAreaChart
+            snapshots={snapshots}
+            currency={currency}
+            title="Net Worth Growth Curve"
+          />
         )}
 
         {/* Snapshots Table */}

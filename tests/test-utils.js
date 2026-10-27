@@ -17,7 +17,7 @@ async function getAvailableBaseUrl() {
     'http://127.0.0.1:3005',
     'http://localhost:3005',
     'http://localhost:3000',
-    'https://finvelayudham.vercel.app',
+    'http://127.0.0.1:3000',
   ].filter(Boolean);
 
   for (const candidate of candidates) {

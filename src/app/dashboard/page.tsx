@@ -494,40 +494,24 @@ export default function DashboardPage() {
         {activeTab === 'overview' && assets.length > 0 && (
           <div className="space-y-8">
             {/* Net Worth Chart */}
-            <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Consolidated Net Worth Trend
-                  </h3>
-                  <div className="text-2xl font-bold text-foreground mt-1">
-                    {formatCurrency(netWorth, currency)}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">Private Vault</div>
-              </div>
-
-              <div className="h-[280px] w-full">
-                <InteractiveAreaChart
-                  snapshots={
-                    snapshots.length > 0
-                      ? snapshots
-                      : [
-                          {
-                            id: 'current-snap',
-                            takenAt: new Date().toISOString().slice(0, 7),
-                            label: 'Current Vault Snapshot',
-                            netWorthBase: netWorth,
-                            totalAssetsBase: totalAssets,
-                            totalLiabilitiesBase: totalLiabilities,
-                            baseCurrency: currency,
-                          },
-                        ]
-                  }
-                  currency={currency}
-                />
-              </div>
-            </div>
+            <InteractiveAreaChart
+              snapshots={
+                snapshots.length > 0
+                  ? snapshots
+                  : [
+                      {
+                        id: 'current-snap',
+                        takenAt: new Date().toISOString().slice(0, 7),
+                        label: 'Current Vault Snapshot',
+                        netWorthBase: netWorth,
+                        totalAssetsBase: totalAssets,
+                        totalLiabilitiesBase: totalLiabilities,
+                        baseCurrency: currency,
+                      },
+                    ]
+              }
+              currency={currency}
+            />
 
             {/* Asset Breakdown & Geography */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -7,9 +7,16 @@ import { formatCurrency, convertAmount } from '@/lib/currencies';
 interface InteractiveAreaChartProps {
   snapshots: Snapshot[];
   currency: string;
+  title?: string;
+  className?: string;
 }
 
-export default function InteractiveAreaChart({ snapshots, currency }: InteractiveAreaChartProps) {
+export default function InteractiveAreaChart({
+  snapshots,
+  currency,
+  title = 'Consolidated Net Worth Trend',
+  className = '',
+}: InteractiveAreaChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -49,11 +56,11 @@ export default function InteractiveAreaChart({ snapshots, currency }: Interactiv
   const activePoint = hoveredIndex !== null ? points[hoveredIndex] : points[points.length - 1];
 
   return (
-    <div className="relative w-full bg-card rounded-xl border border-border p-5 shadow-sm" ref={containerRef}>
+    <div className={`relative w-full bg-card rounded-xl border border-border p-5 shadow-sm ${className}`} ref={containerRef}>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4">
         <div>
           <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-            Consolidated Net Worth Trend
+            {title}
           </span>
           <div className="text-2xl font-serif font-bold text-foreground">
             {formatCurrency(activePoint.convertedNetWorth, currency)}
