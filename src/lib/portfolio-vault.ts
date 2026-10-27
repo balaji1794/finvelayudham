@@ -1,4 +1,4 @@
-import { Asset, Liability, Snapshot, Transaction } from './types';
+import { Asset, Liability, Snapshot, Transaction, Goal } from './types';
 import { encryptPortfolioData, decryptPortfolioData } from './crypto';
 
 export interface UserPortfolio {
@@ -9,6 +9,7 @@ export interface UserPortfolio {
   liabilities: Liability[];
   snapshots: Snapshot[];
   transactions: Transaction[];
+  goals?: Goal[];
   updatedAt: string;
   isEncrypted: boolean;
 }
@@ -53,6 +54,31 @@ export const STARTER_ASSETS: Asset[] = [
 ];
 
 export const STARTER_LIABILITIES: Liability[] = [];
+
+export const STARTER_GOALS: Goal[] = [
+  {
+    id: 'goal-1',
+    name: 'Emergency Fund (6 Months Expenses)',
+    category: 'EMERGENCY_FUND',
+    targetAmount: 500000,
+    currentAmount: 150000,
+    targetDate: '2027-12-31',
+    monthlyContribution: 25000,
+    currency: 'INR',
+    notes: 'Keep in high-yield liquid funds and sweep accounts',
+  },
+  {
+    id: 'goal-2',
+    name: 'Retirement / Financial Independence',
+    category: 'RETIREMENT',
+    targetAmount: 30000000,
+    currentAmount: 500000,
+    targetDate: '2040-03-31',
+    monthlyContribution: 50000,
+    currency: 'INR',
+    notes: 'Long-term equity index compounding target',
+  },
+];
 
 /**
  * Get user-specific storage key
@@ -183,6 +209,7 @@ export async function loadStarterTemplate(
     currency: 'INR',
     assets: [...STARTER_ASSETS],
     liabilities: [...STARTER_LIABILITIES],
+    goals: [...STARTER_GOALS],
     snapshots: [
       {
         id: 'snap-starter',
