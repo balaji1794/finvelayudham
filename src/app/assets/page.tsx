@@ -58,11 +58,8 @@ export default function AssetsPage() {
       if (!user) return;
       setLoading(true);
       try {
-        let portfolio = await loadUserPortfolio(user.id, user.email);
-        if (portfolio.assets.length === 0) {
-          portfolio = await loadStarterTemplate(user.id, user.email);
-        }
-        setAssets(portfolio.assets);
+        const portfolio = await loadUserPortfolio(user.id, user.email);
+        setAssets(portfolio.assets || []);
         setCurrency(portfolio.currency || 'INR');
       } catch (err) {
         console.error('Failed to load user assets:', err);
@@ -327,13 +324,27 @@ export default function AssetsPage() {
                   ? 'No holdings match your current search and category filters.'
                   : 'Start tracking your wealth by adding your first mutual fund, stock, or savings account.'}
               </p>
-              <button
-                onClick={() => setIsAddAssetOpen(true)}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg text-xs hover:bg-primary/90"
-              >
-                <Plus className="w-4 h-4" />
-                Add Asset Now
-              </button>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setIsAddAssetOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg text-xs hover:bg-primary/90"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Asset Now
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!user) return;
+                    setLoading(true);
+                    const starter = await loadStarterTemplate(user.id, user.email);
+                    setAssets(starter.assets);
+                    setLoading(false);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-border bg-card text-foreground font-semibold rounded-lg text-xs hover:bg-muted"
+                >
+                  Load Sample Assets
+                </button>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">

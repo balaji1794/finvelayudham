@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { deriveUserIdFromEmail } from '@/lib/portfolio-vault';
 
 export interface User {
   id: string;
@@ -52,6 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.email) {
+          const cleanEmail = parsed.email.trim().toLowerCase();
+          const expectedId = deriveUserIdFromEmail(cleanEmail);
+          if (parsed.id !== expectedId) {
+            parsed.id = expectedId;
+            parsed.email = cleanEmail;
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+            } catch {}
+          }
           setUser(parsed);
         }
       }
@@ -125,10 +135,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Validated! Activate account and create session
-      const displayName = customName && customName.trim() ? customName.trim() : deriveNameFromEmail(email);
+      const cleanEmail = email.trim().toLowerCase();
+      const displayName = customName && customName.trim() ? customName.trim() : deriveNameFromEmail(cleanEmail);
       const sessionUser: User = {
-        id: 'usr_' + Math.random().toString(36).substring(2, 9),
-        email: email.trim(),
+        id: deriveUserIdFromEmail(cleanEmail),
+        email: cleanEmail,
         name: displayName,
         createdAt: new Date().toISOString(),
         isVerified: true,
@@ -139,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       document.cookie = `finvelayudham_session=${encodeURIComponent(sessionUser.email)}; path=/; max-age=2592000; SameSite=Lax`;
 
       // Trigger welcome email
-      dispatchWelcomeEmail(email, displayName, 'welcome').catch(() => {});
+      dispatchWelcomeEmail(cleanEmail, displayName, 'welcome').catch(() => {});
 
       return { success: true };
     } catch (err: any) {
@@ -148,10 +159,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, customName?: string, password?: string) => {
-    const displayName = customName && customName.trim() ? customName.trim() : deriveNameFromEmail(email);
+    const cleanEmail = email.trim().toLowerCase();
+    const displayName = customName && customName.trim() ? customName.trim() : deriveNameFromEmail(cleanEmail);
     const sessionUser: User = {
-      id: 'usr_' + Math.random().toString(36).substring(2, 9),
-      email: email.trim(),
+      id: deriveUserIdFromEmail(cleanEmail),
+      email: cleanEmail,
       name: displayName,
       createdAt: new Date().toISOString(),
       isVerified: true,
@@ -165,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn('Could not persist session:', err);
     }
 
-    const emailResult = await dispatchWelcomeEmail(email, displayName, 'login');
+    const emailResult = await dispatchWelcomeEmail(cleanEmail, displayName, 'login');
     return {
       success: true,
       emailSent: emailResult.delivered,
@@ -177,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cleanEmail = email.trim().toLowerCase();
     const displayName = name && name.trim() ? name.trim() : deriveNameFromEmail(cleanEmail);
     const sessionUser: User = {
-      id: 'usr_' + Math.random().toString(36).substring(2, 9),
+      id: deriveUserIdFromEmail(cleanEmail),
       email: cleanEmail,
       name: displayName,
       createdAt: new Date().toISOString(),
@@ -204,11 +216,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async (customEmail?: string, customName?: string) => {
-    const email = customEmail || 'balajibuddy1794@gmail.com';
-    const name = customName || deriveNameFromEmail(email);
+    const cleanEmail = (customEmail || 'balajibuddy1794@gmail.com').trim().toLowerCase();
+    const name = customName || deriveNameFromEmail(cleanEmail);
     const sessionUser: User = {
-      id: 'usr_goog_' + Math.random().toString(36).substring(2, 9),
-      email,
+      id: deriveUserIdFromEmail(cleanEmail),
+      email: cleanEmail,
       name,
       createdAt: new Date().toISOString(),
       isVerified: true,
@@ -222,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn('Could not persist session:', err);
     }
 
-    const emailResult = await dispatchWelcomeEmail(email, name, 'login');
+    const emailResult = await dispatchWelcomeEmail(cleanEmail, name, 'login');
     return {
       success: true,
       emailSent: emailResult.delivered,

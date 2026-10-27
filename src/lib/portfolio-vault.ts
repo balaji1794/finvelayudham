@@ -16,6 +16,23 @@ export interface UserPortfolio {
 
 const VAULT_PREFIX = 'finvelayudham_vault_';
 
+/**
+ * Deterministically derives a stable, permanent User ID from an email address.
+ * Guarantees that across all logins, logouts, re-logins, and page refreshes,
+ * the user always accesses the exact same vault storage slot without key drifting.
+ */
+export function deriveUserIdFromEmail(email: string): string {
+  const clean = (email || '').trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) {
+    hash = (hash << 5) - hash + clean.charCodeAt(i);
+    hash |= 0;
+  }
+  const safeSlug = clean.replace(/[^a-z0-9]/g, '_').slice(0, 24);
+  const hashStr = Math.abs(hash).toString(36);
+  return `usr_${hashStr}_${safeSlug}`;
+}
+
 // Clean starter assets for new users who want a kickstart
 export const STARTER_ASSETS: Asset[] = [
   {
@@ -81,23 +98,37 @@ export const STARTER_GOALS: Goal[] = [
 ];
 
 /**
- * Get user-specific storage key
+ * Get user-specific storage key based on deterministic user ID
  */
-function getStorageKey(userId: string): string {
+export function getStorageKey(userId: string): string {
   return `${VAULT_PREFIX}${userId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 }
 
 /**
- * Load user's private encrypted portfolio vault
+ * Get email-anchored storage key for cross-session redundancy
+ */
+export function getEmailStorageKey(email: string): string {
+  const clean = (email || '').trim().toLowerCase();
+  return `${VAULT_PREFIX}email_${clean.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+}
+
+/**
+ * Load user's private encrypted portfolio vault.
+ * Automatically handles:
+ * 1. Primary target storage key lookup (based on deterministic userId derived from email)
+ * 2. Multi-key decryption fallback (userId, userEmail, cleanEmail)
+ * 3. Automatic migration & recovery of orphaned vault keys created in previous sessions
+ * 4. Server API sync fallback by userId & email
  */
 export async function loadUserPortfolio(
   userId: string,
   userEmail: string,
   secretKey: string = userId
 ): Promise<UserPortfolio> {
+  const cleanEmail = (userEmail || '').trim().toLowerCase();
   const defaultEmptyPortfolio: UserPortfolio = {
     userId,
-    email: userEmail,
+    email: cleanEmail || userEmail,
     currency: 'INR',
     assets: [],
     liabilities: [],
@@ -111,41 +142,158 @@ export async function loadUserPortfolio(
     return defaultEmptyPortfolio;
   }
 
-  try {
-    const rawData = localStorage.getItem(getStorageKey(userId));
-    if (!rawData) {
-      // Also check server API if local cache is empty
+  // Helper to decrypt raw vault string with multiple candidate secrets
+  async function attemptDecryption(rawData: string, extraKeys: string[] = []): Promise<any | null> {
+    const keysToTry = [secretKey, userId, cleanEmail, userEmail, ...extraKeys].filter(
+      (k, idx, arr) => Boolean(k) && arr.indexOf(k) === idx
+    );
+
+    for (const key of keysToTry) {
       try {
-        const res = await fetch(`/api/portfolio?userId=${encodeURIComponent(userId)}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.payload) {
-            const decryptedServer = await decryptPortfolioData(json.payload, secretKey);
-            if (decryptedServer && Array.isArray(decryptedServer.assets)) {
-              return {
-                ...decryptedServer,
-                userId,
-                email: userEmail,
-                isEncrypted: true,
-              };
-            }
-          }
+        const decrypted = await decryptPortfolioData(rawData, key);
+        if (decrypted && (Array.isArray(decrypted.assets) || Array.isArray(decrypted.liabilities))) {
+          return decrypted;
         }
-      } catch (err) {
-        console.warn('Server vault fetch skipped or offline');
+      } catch {
+        // try next key
       }
-      return defaultEmptyPortfolio;
     }
 
-    // Attempt decryption
-    const decrypted = await decryptPortfolioData(rawData, secretKey);
-    if (decrypted && Array.isArray(decrypted.assets)) {
-      return {
-        ...decrypted,
-        userId,
-        email: userEmail,
-        isEncrypted: true,
-      };
+    // Try unencrypted plain JSON fallback
+    try {
+      const parsed = JSON.parse(rawData);
+      if (parsed && (Array.isArray(parsed.assets) || Array.isArray(parsed.liabilities))) {
+        return parsed;
+      }
+    } catch {}
+
+    return null;
+  }
+
+  try {
+    const primaryKey = getStorageKey(userId);
+    const emailKey = cleanEmail ? getEmailStorageKey(cleanEmail) : null;
+
+    // 1. Try Primary Key (finvelayudham_vault_usr_...)
+    const primaryData = localStorage.getItem(primaryKey);
+    if (primaryData) {
+      const decrypted = await attemptDecryption(primaryData);
+      if (decrypted) {
+        return {
+          ...decrypted,
+          userId,
+          email: cleanEmail || userEmail,
+          currency: decrypted.currency || 'INR',
+          assets: Array.isArray(decrypted.assets) ? decrypted.assets : [],
+          liabilities: Array.isArray(decrypted.liabilities) ? decrypted.liabilities : [],
+          snapshots: Array.isArray(decrypted.snapshots) ? decrypted.snapshots : [],
+          transactions: Array.isArray(decrypted.transactions) ? decrypted.transactions : [],
+          goals: Array.isArray(decrypted.goals) ? decrypted.goals : [],
+          isEncrypted: true,
+        };
+      }
+    }
+
+    // 2. Try Email-Indexed Mirror Key (finvelayudham_vault_email_...)
+    if (emailKey) {
+      const emailMirrorData = localStorage.getItem(emailKey);
+      if (emailMirrorData) {
+        const decrypted = await attemptDecryption(emailMirrorData);
+        if (decrypted) {
+          const restored: UserPortfolio = {
+            ...decrypted,
+            userId,
+            email: cleanEmail || userEmail,
+            currency: decrypted.currency || 'INR',
+            assets: Array.isArray(decrypted.assets) ? decrypted.assets : [],
+            liabilities: Array.isArray(decrypted.liabilities) ? decrypted.liabilities : [],
+            snapshots: Array.isArray(decrypted.snapshots) ? decrypted.snapshots : [],
+            transactions: Array.isArray(decrypted.transactions) ? decrypted.transactions : [],
+            goals: Array.isArray(decrypted.goals) ? decrypted.goals : [],
+            isEncrypted: true,
+          };
+          // Persist to primary deterministic slot as well
+          await saveUserPortfolio(restored, secretKey);
+          return restored;
+        }
+      }
+    }
+
+    // 3. Automatic Orphan Vault Recovery Scanner:
+    // If the user previously logged in under a random ephemeral session ID (e.g. usr_xyz789),
+    // find that orphaned vault, decrypt it, adopt the holdings, and migrate them forward!
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(VAULT_PREFIX) || k === primaryKey || (emailKey && k === emailKey)) {
+        continue;
+      }
+
+      const orphanRaw = localStorage.getItem(k);
+      if (!orphanRaw) continue;
+
+      // The candidate key suffix was the old userId used as its secretKey!
+      const candidateOldUserId = k.substring(VAULT_PREFIX.length);
+      const orphanDecrypted = await attemptDecryption(orphanRaw, [candidateOldUserId]);
+
+      if (orphanDecrypted) {
+        const hasHoldings =
+          (orphanDecrypted.assets && orphanDecrypted.assets.length > 0) ||
+          (orphanDecrypted.liabilities && orphanDecrypted.liabilities.length > 0);
+        const matchesEmail =
+          orphanDecrypted.email && orphanDecrypted.email.trim().toLowerCase() === cleanEmail;
+
+        if (matchesEmail || hasHoldings) {
+          console.info(`[FinVelayudham Vault Recovery] Successfully rescued portfolio from ${k} for ${cleanEmail}`);
+          const rescuedPortfolio: UserPortfolio = {
+            ...orphanDecrypted,
+            userId,
+            email: cleanEmail || userEmail,
+            currency: orphanDecrypted.currency || 'INR',
+            assets: Array.isArray(orphanDecrypted.assets) ? orphanDecrypted.assets : [],
+            liabilities: Array.isArray(orphanDecrypted.liabilities) ? orphanDecrypted.liabilities : [],
+            snapshots: Array.isArray(orphanDecrypted.snapshots) ? orphanDecrypted.snapshots : [],
+            transactions: Array.isArray(orphanDecrypted.transactions) ? orphanDecrypted.transactions : [],
+            goals: Array.isArray(orphanDecrypted.goals) ? orphanDecrypted.goals : [],
+            isEncrypted: true,
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Re-save under primary deterministic key and email mirror
+          await saveUserPortfolio(rescuedPortfolio, secretKey);
+          return rescuedPortfolio;
+        }
+      }
+    }
+
+    // 4. Server API sync fallback
+    try {
+      const serverUrl = `/api/portfolio?userId=${encodeURIComponent(userId)}&email=${encodeURIComponent(cleanEmail)}`;
+      const res = await fetch(serverUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.payload) {
+          const decryptedServer = await attemptDecryption(json.payload);
+          if (decryptedServer) {
+            const serverRestored: UserPortfolio = {
+              ...decryptedServer,
+              userId,
+              email: cleanEmail || userEmail,
+              currency: decryptedServer.currency || 'INR',
+              assets: Array.isArray(decryptedServer.assets) ? decryptedServer.assets : [],
+              liabilities: Array.isArray(decryptedServer.liabilities) ? decryptedServer.liabilities : [],
+              snapshots: Array.isArray(decryptedServer.snapshots) ? decryptedServer.snapshots : [],
+              transactions: Array.isArray(decryptedServer.transactions) ? decryptedServer.transactions : [],
+              goals: Array.isArray(decryptedServer.goals) ? decryptedServer.goals : [],
+              isEncrypted: true,
+            };
+            // Cache locally for offline and fast retrieval
+            await saveUserPortfolio(serverRestored, secretKey);
+            return serverRestored;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Server vault fetch skipped or offline:', err);
     }
 
     return defaultEmptyPortfolio;
@@ -156,7 +304,9 @@ export async function loadUserPortfolio(
 }
 
 /**
- * Save user's private encrypted portfolio vault
+ * Save user's private encrypted portfolio vault.
+ * Saves client-side in primary deterministic storage, email-indexed mirror,
+ * and synchronizes with server API in the background.
  */
 export async function saveUserPortfolio(
   portfolio: UserPortfolio,
@@ -170,19 +320,27 @@ export async function saveUserPortfolio(
     portfolio.updatedAt = new Date().toISOString();
     portfolio.isEncrypted = true;
 
-    // Encrypt client-side using AES-GCM
-    const encryptedString = await encryptPortfolioData(portfolio, secretKey);
+    const cleanEmail = (portfolio.email || '').trim().toLowerCase();
+    const effectiveSecretKey = secretKey || portfolio.userId || cleanEmail;
 
-    // Save into private user localStorage slot
+    // Encrypt client-side using AES-GCM
+    const encryptedString = await encryptPortfolioData(portfolio, effectiveSecretKey);
+
+    // 1. Save into private user localStorage slot by userId
     localStorage.setItem(getStorageKey(portfolio.userId), encryptedString);
 
-    // Sync to backend API in background for resilience
+    // 2. Also save into email-anchored mirror slot for cross-session resilience
+    if (cleanEmail) {
+      localStorage.setItem(getEmailStorageKey(cleanEmail), encryptedString);
+    }
+
+    // 3. Sync to backend API in background for resilience across devices
     fetch('/api/portfolio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId: portfolio.userId,
-        email: portfolio.email,
+        email: cleanEmail,
         payload: encryptedString,
         updatedAt: portfolio.updatedAt,
       }),
@@ -233,13 +391,28 @@ export async function loadStarterTemplate(
 /**
  * Permanently purge user portfolio data (GDPR / Right to erasure)
  */
-export async function purgeUserPortfolio(userId: string): Promise<void> {
+export async function purgeUserPortfolio(userId: string, userEmail?: string): Promise<void> {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(getStorageKey(userId));
+    if (userEmail) {
+      localStorage.removeItem(getEmailStorageKey(userEmail));
+    }
+    // Also remove any matching vault keys
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(VAULT_PREFIX) && (k.includes(userId) || (userEmail && k.includes(userEmail.replace(/[^a-zA-Z0-9_-]/g, '_'))))) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {}
   }
 
   try {
-    await fetch(`/api/portfolio?userId=${encodeURIComponent(userId)}`, {
+    const query = new URLSearchParams({ userId, email: userEmail || '' }).toString();
+    await fetch(`/api/portfolio?${query}`, {
       method: 'DELETE',
     });
   } catch (err) {
