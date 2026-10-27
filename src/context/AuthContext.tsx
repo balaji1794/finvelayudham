@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { deriveUserIdFromEmail } from '@/lib/portfolio-vault';
+import { deriveUserIdFromEmail, loadUserPortfolio, saveUserPortfolio, UserPortfolio } from '@/lib/portfolio-vault';
 import { hashCredentials } from '@/lib/crypto';
 
 export interface User {
@@ -21,6 +21,7 @@ interface AuthContextType {
   requestVerification: (email: string, name: string) => Promise<{ success: boolean; delivered?: boolean; deliveredTo?: string; sandboxCode?: string; message?: string }>;
   confirmVerification: (email: string, code: string, password?: string, name?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: (email?: string, name?: string) => Promise<{ success: boolean; emailSent?: boolean; message?: string }>;
+  updateProfile: (updates: { name?: string; email?: string; newPassword?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -381,6 +382,107 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  const updateProfile = async (updates: { name?: string; email?: string; newPassword?: string }): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'User session not found. Please log in again.' };
+    }
+
+    const currentEmail = user.email.trim().toLowerCase();
+    const targetEmail = updates.email ? updates.email.trim().toLowerCase() : currentEmail;
+    const targetName = updates.name && updates.name.trim() ? updates.name.trim() : user.name;
+
+    if (updates.email && (!targetEmail.includes('@') || targetEmail.length < 5)) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+
+    if (updates.newPassword && updates.newPassword.length < 8) {
+      return { success: false, error: 'New password must be at least 8 characters long.' };
+    }
+
+    // 1. Update on backend API
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentEmail,
+          name: targetName,
+          newEmail: targetEmail !== currentEmail ? targetEmail : undefined,
+          newPassword: updates.newPassword || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Server rejected profile update' };
+      }
+    } catch (err) {
+      console.warn('Backend profile update offline fallback:', err);
+    }
+
+    // 2. Update local credentials store
+    try {
+      const stored = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+      const accounts = stored ? JSON.parse(stored) : {};
+      const existingAccount = accounts[currentEmail] || {};
+      let updatedHash = existingAccount.passwordHash;
+
+      if (updates.newPassword) {
+        updatedHash = await hashCredentials(updates.newPassword, targetEmail);
+      }
+
+      if (targetEmail !== currentEmail) {
+        delete accounts[currentEmail];
+      }
+
+      accounts[targetEmail] = {
+        ...existingAccount,
+        email: targetEmail,
+        name: targetName,
+        passwordHash: updatedHash,
+        updatedAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+    } catch {}
+
+    // 3. If email changed, migrate user's private encrypted vault!
+    const newUserId = deriveUserIdFromEmail(targetEmail);
+    if (targetEmail !== currentEmail && typeof window !== 'undefined') {
+      try {
+        const currentPortfolio = await loadUserPortfolio(user.id, currentEmail);
+        if (currentPortfolio) {
+          const migratedPortfolio: UserPortfolio = {
+            ...currentPortfolio,
+            userId: newUserId,
+            email: targetEmail,
+            updatedAt: new Date().toISOString(),
+          };
+          await saveUserPortfolio(migratedPortfolio, newUserId);
+        }
+      } catch (err) {
+        console.warn('Vault migration on email change error:', err);
+      }
+    }
+
+    // 4. Update session user state
+    const updatedUser: User = {
+      ...user,
+      id: newUserId,
+      email: targetEmail,
+      name: targetName,
+    };
+
+    setUser(updatedUser);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+      document.cookie = `finvelayudham_session=${encodeURIComponent(updatedUser.email)}; path=/; max-age=2592000; SameSite=Lax`;
+    } catch (err) {
+      console.warn('Could not persist updated session:', err);
+    }
+
+    return { success: true };
+  };
+
   const logout = () => {
     setUser(null);
     try {
@@ -401,6 +503,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         requestVerification,
         confirmVerification,
         loginWithGoogle,
+        updateProfile,
         logout,
       }}
     >
