@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3005';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://finvelayudham.vercel.app';
 
 // Indian Number Formatting function matching src/lib/utils.ts
 function formatIndianCurrency(amount, currency = 'INR') {

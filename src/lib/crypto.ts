@@ -134,11 +134,15 @@ export async function decryptPortfolioData(encryptedString: string, userSecret: 
 }
 
 /**
- * Hash a password or sensitive token using SHA-256 with a unique salt
+ * Hash a password or sensitive token using SHA-256 with a unique salt (returns lowercase hex)
  */
 export async function hashCredentials(text: string, salt: string = 'finvelayudham_secure_salt'): Promise<string> {
+  if (typeof window === 'undefined' && typeof crypto === 'undefined') {
+    return text;
+  }
   const enc = new TextEncoder();
   const data = enc.encode(`${salt}:${text}`);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return bufferToBase64(hashBuffer);
+  const bytes = new Uint8Array(hashBuffer);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }

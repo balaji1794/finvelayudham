@@ -49,7 +49,7 @@ function LoginForm() {
         if (res.success) {
           setRegistrationSuccess({ email: email.trim().toLowerCase() });
         } else {
-          setError('Registration could not be completed. Please try again.');
+          setError(res.message || 'Registration could not be completed. Please try again.');
         }
         setLoading(false);
         return;
@@ -60,7 +60,7 @@ function LoginForm() {
       if (res.success) {
         router.push(redirectUrl);
       } else {
-        setError('Invalid email or password.');
+        setError(res.message || 'Invalid email or password.');
         setLoading(false);
       }
     } catch {

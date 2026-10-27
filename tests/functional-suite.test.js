@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3005';
+const BASE_URL = process.env.TEST_BASE_URL || 'https://finvelayudham.vercel.app';
 
 // Helper for HTTP requests
 async function fetchApi(path, options = {}) {
