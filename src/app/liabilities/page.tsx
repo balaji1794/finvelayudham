@@ -1,52 +1,41 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   CreditCard,
   Plus,
   Trash2,
-  ShieldCheck,
-  AlertCircle,
-  Home,
-  Car,
-  DollarSign,
+  CheckCircle2,
   TrendingDown,
   Percent,
-  Calendar,
-  Layers,
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import AppLayout from '@/components/AppLayout';
+import WealthSubNav from '@/components/WealthSubNav';
 import AddLiabilityModal from '@/components/AddLiabilityModal';
 import { Liability, Asset } from '@/lib/types';
 import { formatCurrency, convertAmount } from '@/lib/currencies';
 import { useAuth } from '@/context/AuthContext';
-import {
-  loadUserPortfolio,
-  saveUserPortfolio,
-} from '@/lib/portfolio-vault';
+import { usePrivacy } from '@/context/PrivacyContext';
+import { loadUserPortfolio, saveUserPortfolio } from '@/lib/portfolio-vault';
 
 export default function LiabilitiesPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { maskValue } = usePrivacy();
 
   const [currency, setCurrency] = useState('INR');
   const [loading, setLoading] = useState(true);
   const [liabilities, setLiabilities] = useState<Liability[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string>('');
 
-  // Redirect to login if user is not signed in
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login?redirect=/liabilities');
     }
   }, [user, authLoading, router]);
 
-  // Load user's private encrypted vault
   useEffect(() => {
     async function initVault() {
       if (!user) return;
@@ -65,296 +54,206 @@ export default function LiabilitiesPage() {
     initVault();
   }, [user]);
 
-  // Save changes to encrypted vault
   const persistChanges = async (updatedLiabilities: Liability[]) => {
     if (!user) return;
     setLiabilities(updatedLiabilities);
-    setSaveStatus('Encrypting & Saving...');
     try {
       const currentVault = await loadUserPortfolio(user.id, user.email);
       await saveUserPortfolio({
         ...currentVault,
-        currency,
         liabilities: updatedLiabilities,
+        updatedAt: new Date().toISOString(),
       });
-      setSaveStatus('Encrypted & Synced');
-      setTimeout(() => setSaveStatus(''), 2500);
     } catch (err) {
-      console.error('Error saving liabilities:', err);
-      setSaveStatus('Save Failed');
+      console.error('Failed to save liabilities:', err);
     }
   };
 
   const handleAddLiability = async (newLiability: Liability) => {
-    await persistChanges([...liabilities, newLiability]);
-    setIsAddOpen(false);
+    const updated = [newLiability, ...liabilities];
+    await persistChanges(updated);
   };
 
   const handleDeleteLiability = async (id: string) => {
-    if (confirm('Are you sure you want to delete this liability?')) {
-      const filtered = liabilities.filter((l) => l.id !== id);
-      await persistChanges(filtered);
-    }
+    const updated = liabilities.filter((l) => l.id !== id);
+    await persistChanges(updated);
   };
 
-  const getConvertedAmount = (amount: number, fromCurr: string) => {
-    return convertAmount(amount, fromCurr, currency);
-  };
-
-  // Computations
-  const totalDebt = useMemo(() => {
-    return liabilities.reduce((sum, l) => sum + getConvertedAmount(l.outstandingAmount, l.currency), 0);
-  }, [liabilities, currency]);
-
-  const totalMonthlyEmi = useMemo(() => {
-    return liabilities.reduce((sum, l) => sum + getConvertedAmount(l.monthlyEmi, l.currency), 0);
-  }, [liabilities, currency]);
-
-  const totalAssetValue = useMemo(() => {
-    return assets.reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
-  }, [assets, currency]);
-
-  const debtToAssetRatio = totalAssetValue > 0 ? (totalDebt / totalAssetValue) * 100 : 0;
-
-  const weightedInterestRate = useMemo(() => {
-    if (totalDebt === 0) return 0;
-    const totalInterestWeighted = liabilities.reduce(
-      (sum, l) => sum + getConvertedAmount(l.outstandingAmount, l.currency) * l.interestRate,
+  const totalLiabilities = useMemo(() => {
+    return liabilities.reduce(
+      (sum, l) => sum + convertAmount(l.outstandingAmount, l.currency, currency),
       0
     );
-    return totalInterestWeighted / totalDebt;
-  }, [liabilities, totalDebt, currency]);
+  }, [liabilities, currency]);
 
-  const getLiabilityIcon = (type: string) => {
-    switch (type) {
-      case 'HOME_LOAN':
-        return <Home className="w-4 h-4 text-emerald-500" />;
-      case 'AUTO_LOAN':
-        return <Car className="w-4 h-4 text-blue-500" />;
-      case 'CREDIT_CARD':
-        return <CreditCard className="w-4 h-4 text-rose-500" />;
-      default:
-        return <DollarSign className="w-4 h-4 text-amber-500" />;
-    }
-  };
+  const totalAssets = useMemo(() => {
+    return assets.reduce(
+      (sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency),
+      0
+    );
+  }, [assets, currency]);
+
+  const totalMonthlyEmi = useMemo(() => {
+    return liabilities.reduce(
+      (sum, l) => sum + convertAmount(l.monthlyEmi, l.currency, currency),
+      0
+    );
+  }, [liabilities, currency]);
+
+  const debtRatio = totalAssets > 0 ? (totalLiabilities / totalAssets) * 100 : 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <Navbar currentCurrency={currency} onCurrencyChange={setCurrency} />
+    <AppLayout
+      currency={currency}
+      onCurrencyChange={setCurrency}
+      title="Liabilities"
+      onAddLiability={handleAddLiability}
+    >
+      <div className="space-y-6">
+        {/* Wealth Sub-Navigation */}
+        <WealthSubNav />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+        {/* Top Header: Title, Description & Add Liability Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">
-                Liabilities & Debt
-              </h1>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Private Vault
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track home loans, car loans, education debt, and credit card balances with EMI projections.
+            <h1 className="font-serif text-2xl font-bold text-foreground">Liabilities</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Track your debt, mortgages, car loans, and credit cards.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            {saveStatus && (
-              <span className="text-xs font-medium text-primary animate-pulse">
-                {saveStatus}
-              </span>
-            )}
             <button
               onClick={() => setIsAddOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground font-semibold rounded-lg shadow hover:opacity-90 transition-all text-sm"
+              className="px-4 py-2 rounded-xl bg-[#134e35] hover:bg-[#0f3d2a] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              Add Liability
+              <span>Add Liability</span>
             </button>
           </div>
         </div>
 
-        {/* KPI Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Total Outstanding Debt
+        {/* Empty State Matching FinBoom (Image 3) */}
+        {liabilities.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl py-20 px-6 text-center max-w-2xl mx-auto my-12 shadow-xs">
+            <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-7 h-7" />
             </div>
-            <div className="font-serif text-2xl font-bold text-destructive">
-              {formatCurrency(totalDebt, currency)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">Across {liabilities.length} active loans</div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Total Monthly EMI
-            </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {formatCurrency(totalMonthlyEmi, currency)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">Monthly cashflow obligation</div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Avg Interest Rate
-            </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {weightedInterestRate.toFixed(2)}%
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">Weighted by loan balance</div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Debt-to-Asset Ratio
-            </div>
-            <div
-              className={`font-serif text-2xl font-bold ${
-                debtToAssetRatio < 30
-                  ? 'text-primary'
-                  : debtToAssetRatio < 50
-                  ? 'text-amber-500'
-                  : 'text-destructive'
-              }`}
+            <h2 className="text-lg font-bold text-foreground mb-1">No Liabilities</h2>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed mb-6">
+              Debt-free is a great place to be! Add loans or credit card balances here if you have any.
+            </p>
+            <button
+              onClick={() => setIsAddOpen(true)}
+              className="px-5 py-2.5 rounded-xl bg-[#134e35] hover:bg-[#0f3d2a] text-white text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer"
             >
-              {debtToAssetRatio.toFixed(1)}%
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {debtToAssetRatio < 30 ? 'Healthy Financial Buffer' : 'Moderate Debt Exposure'}
-            </div>
+              <Plus className="w-4 h-4" />
+              <span>Add Liability</span>
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-6">
+            {/* KPI Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-xs">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block mb-1">
+                  Total Outstanding Debt
+                </span>
+                <div className="text-2xl font-serif font-bold text-destructive">
+                  {maskValue(formatCurrency(totalLiabilities, currency))}
+                </div>
+              </div>
 
-        {/* Debt Payoff Strategy Tip */}
-        <div className="bg-muted/40 border border-border rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
-              <Layers className="w-5 h-5" />
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-xs">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block mb-1">
+                  Monthly Outflow (EMI)
+                </span>
+                <div className="text-2xl font-serif font-bold text-foreground">
+                  {maskValue(formatCurrency(totalMonthlyEmi, currency))}
+                </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-xs">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block mb-1">
+                  Debt-to-Asset Ratio
+                </span>
+                <div className="text-2xl font-serif font-bold text-foreground">
+                  {debtRatio.toFixed(1)}%
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-foreground">
-                Debt Avalanche vs. Snowball Payoff Strategy
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
-                Pay the minimum on all loans, then direct extra surplus to the loan with the highest
-                interest rate (Avalanche: saves max interest) or lowest balance (Snowball: fast psychological wins).
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/calculators/emi"
-            className="text-xs font-semibold text-primary hover:underline whitespace-nowrap"
-          >
-            Open Loan EMI Calculator →
-          </Link>
-        </div>
 
-        {/* Liabilities Table */}
-        <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Active Liabilities ({liabilities.length})
-            </h2>
-            <div className="text-xs text-muted-foreground">Values shown in {currency}</div>
-          </div>
-
-          {liabilities.length === 0 ? (
-            <div className="text-center py-16 px-4">
-              <CreditCard className="w-12 h-12 text-primary/40 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-foreground">Zero Debt Recorded!</h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                You have no outstanding liabilities or loans recorded. 100% of your assets contribute directly to your net worth.
-              </p>
-              <button
-                onClick={() => setIsAddOpen(true)}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-xs font-medium text-foreground hover:bg-muted"
-              >
-                <Plus className="w-4 h-4" />
-                Add a Loan or Credit Card
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/40 text-xs font-semibold text-muted-foreground border-b border-border">
-                  <tr>
-                    <th className="py-3 px-4">Liability Name</th>
-                    <th className="py-3 px-4">Type</th>
-                    <th className="py-3 px-4">Lender</th>
-                    <th className="py-3 px-4 text-right">Interest Rate</th>
-                    <th className="py-3 px-4 text-right">Monthly EMI</th>
-                    <th className="py-3 px-4 text-right">Outstanding Balance</th>
-                    <th className="py-3 px-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {liabilities.map((liab) => {
-                    const convBalance = getConvertedAmount(liab.outstandingAmount, liab.currency);
-                    const convEmi = getConvertedAmount(liab.monthlyEmi, liab.currency);
-
-                    return (
-                      <tr key={liab.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-foreground flex items-center gap-2.5">
-                          <div className="p-1.5 rounded-md bg-muted border border-border">
-                            {getLiabilityIcon(liab.liabilityType)}
-                          </div>
-                          <span>{liab.name}</span>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-muted text-foreground">
-                            {liab.liabilityType.replace('_', ' ')}
+            {/* Liabilities Table */}
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 border-b border-border uppercase tracking-wider text-muted-foreground font-semibold">
+                    <tr>
+                      <th className="p-4">Liability</th>
+                      <th className="p-4">Type</th>
+                      <th className="p-4">Lender</th>
+                      <th className="p-4 text-right">Interest Rate</th>
+                      <th className="p-4 text-right">Monthly EMI</th>
+                      <th className="p-4 text-right">Outstanding Balance</th>
+                      <th className="p-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {liabilities.map((item) => (
+                      <tr key={item.id} className="hover:bg-muted/20 transition-colors">
+                        <td className="p-4 font-semibold text-foreground">{item.name}</td>
+                        <td className="p-4">
+                          <span className="px-2 py-0.5 rounded-md bg-muted text-[10px] font-bold text-muted-foreground">
+                            {item.liabilityType}
                           </span>
                         </td>
-
-                        <td className="py-3.5 px-4 text-xs text-muted-foreground">
-                          {liab.lender || 'Direct Provider'}
+                        <td className="p-4 text-muted-foreground">{item.lender || '—'}</td>
+                        <td className="p-4 text-right font-mono text-muted-foreground">
+                          {item.interestRate}%
                         </td>
-
-                        <td className="py-3.5 px-4 text-right font-mono text-xs font-semibold text-foreground">
-                          {liab.interestRate}%
+                        <td className="p-4 text-right font-mono font-medium text-foreground">
+                          {maskValue(
+                            formatCurrency(
+                              convertAmount(item.monthlyEmi, item.currency, currency),
+                              currency
+                            )
+                          )}
                         </td>
-
-                        <td className="py-3.5 px-4 text-right font-mono text-xs font-semibold text-foreground">
-                          {formatCurrency(convEmi, currency)}/mo
+                        <td className="p-4 text-right font-mono font-bold text-destructive">
+                          {maskValue(
+                            formatCurrency(
+                              convertAmount(item.outstandingAmount, item.currency, currency),
+                              currency
+                            )
+                          )}
                         </td>
-
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-destructive">
-                          {formatCurrency(convBalance, currency)}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="p-4 text-right">
                           <button
-                            onClick={() => handleDeleteLiability(liab.id)}
-                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                            title="Delete Liability"
+                            onClick={() => handleDeleteLiability(item.id)}
+                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          )}
-        </div>
-      </main>
+          </div>
+        )}
+      </div>
 
-      {/* Add Liability Modal */}
       <AddLiabilityModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        onAdd={handleAddLiability}
+        onAdd={(liability) => {
+          handleAddLiability(liability);
+          setIsAddOpen(false);
+        }}
         defaultCurrency={currency}
       />
-
-      <Footer />
-    </div>
+    </AppLayout>
   );
 }

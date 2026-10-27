@@ -507,19 +507,170 @@ export default function DashboardPage() {
         </div>
 
         {/* =========================================================================
-            ROW 3: WEALTH SECTION (CHART & ALLOCATION)
-            Matches FinBoom's Wealth Showcase
+            ROW 3: WEALTH SNAPSHOT (TOTAL ASSETS & TOTAL LIABILITIES)
+            Matches FinBoom's Wealth Split Section (Image 1)
            ========================================================================= */}
-        <div className="pt-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                <TrendingUp className="w-4 h-4" />
-              </span>
-              <h2 className="font-serif text-lg font-bold text-foreground">
-                Wealth Trajectory & Asset Mix
-              </h2>
+        <div className="pt-2 space-y-4">
+          <div className="flex items-center gap-2 pb-1 border-b-2 border-emerald-700/60">
+            <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <TrendingUp className="w-4 h-4" />
+            </span>
+            <h2 className="font-serif text-lg font-bold text-foreground">Wealth</h2>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+              {/* Left: TOTAL ASSETS */}
+              <div className="p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+                    Total Assets ({assets.length})
+                  </span>
+                  <span className="text-sm font-bold font-mono text-foreground">
+                    {maskValue(formatCurrency(totalAssets, currency))}
+                  </span>
+                </div>
+
+                {assets.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4">
+                    No assets recorded yet. Use the Quick Add or Import tool.
+                  </p>
+                ) : (
+                  <div className="space-y-3 pt-1">
+                    {(() => {
+                      const categories = ['EQUITY', 'COMMODITIES', 'CASH', 'DEBT', 'REAL_ESTATE'];
+                      return categories
+                        .map((cat) => {
+                          const catTotal = assets
+                            .filter((a) => (a.category || '').toUpperCase() === cat)
+                            .reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
+                          const pct = totalAssets > 0 ? (catTotal / totalAssets) * 100 : 0;
+                          if (catTotal === 0) return null;
+                          return (
+                            <div key={cat} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="flex items-center gap-1.5 font-medium text-foreground capitalize">
+                                  <span className="w-2 h-2 rounded-full bg-primary" />
+                                  {cat.toLowerCase().replace(/_/g, ' ')}
+                                </span>
+                                <span className="font-mono text-muted-foreground">
+                                  {maskValue(formatCurrency(catTotal, currency))} ({pct.toFixed(1)}%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-primary h-full rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })
+                        .filter(Boolean);
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Right: TOTAL LIABILITIES */}
+              <div className="p-5 sm:p-6 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+                      Total Liabilities
+                    </span>
+                    <span className="text-sm font-bold font-mono text-destructive">
+                      {maskValue(formatCurrency(totalLiabilities, currency))}
+                    </span>
+                  </div>
+
+                  {liabilities.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-muted-foreground">
+                      <p>No liabilities recorded.</p>
+                      <button
+                        onClick={() => setIsAddLiabilityOpen(true)}
+                        className="mt-2 text-primary hover:underline font-semibold cursor-pointer"
+                      >
+                        Add liability →
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {liabilities.map((l) => (
+                        <div key={l.id} className="flex justify-between items-center text-xs py-1">
+                          <span className="font-medium text-foreground">{l.name}</span>
+                          <span className="font-mono text-destructive">
+                            {maskValue(formatCurrency(convertAmount(l.outstandingAmount, l.currency, currency), currency))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-border flex items-center justify-between text-xs">
+                  <Link href="/assets" className="text-primary hover:underline font-medium">
+                    All assets →
+                  </Link>
+                  <Link href="/liabilities" className="text-primary hover:underline font-medium">
+                    All liabilities →
+                  </Link>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            ROW 4: TOP INVESTMENTS & HOLDINGS (Image 1)
+           ========================================================================= */}
+        {assets.length > 0 && (
+          <div className="pt-2 space-y-4">
+            <div className="flex items-center justify-between pb-1 border-b border-border">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+                Top Holdings
+              </span>
+              <Link href="/assets" className="text-xs text-primary hover:underline font-semibold">
+                All assets ({assets.length}) →
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {assets.slice(0, 6).map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-card border border-border rounded-xl p-3.5 shadow-xs hover:border-primary/40 transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase font-bold">
+                      {item.category}
+                    </span>
+                    <h3 className="text-xs font-bold text-foreground mt-1.5 truncate" title={item.name}>
+                      {item.name}
+                    </h3>
+                    {item.subClass && (
+                      <p className="text-[11px] text-muted-foreground truncate">{item.subClass}</p>
+                    )}
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-border/60 flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-foreground">
+                      {maskValue(formatCurrency(convertAmount(item.currentValue, item.currentCurrency, currency), currency))}
+                    </span>
+                    <Link href="/assets" className="text-[11px] text-primary hover:underline font-medium">
+                      View →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            ROW 5: WEALTH TRAJECTORY CHART & DONUT ALLOCATION
+           ========================================================================= */}
+        <div className="pt-4 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-lg font-bold text-foreground">
+              Consolidated Growth & Exposure
+            </h2>
             <Link href="/wealth" className="text-xs font-semibold text-primary hover:underline">
               Open Full Wealth Hub →
             </Link>

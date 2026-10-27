@@ -1,51 +1,49 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Camera,
   Plus,
   Trash2,
-  ShieldCheck,
-  TrendingUp,
-  TrendingDown,
   Calendar,
-  Download,
   BarChart3,
-  Clock,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import AppLayout from '@/components/AppLayout';
+import WealthSubNav from '@/components/WealthSubNav';
 import InteractiveAreaChart from '@/components/InteractiveAreaChart';
 import { Snapshot, Asset, Liability } from '@/lib/types';
 import { formatCurrency, convertAmount } from '@/lib/currencies';
 import { useAuth } from '@/context/AuthContext';
-import {
-  loadUserPortfolio,
-  saveUserPortfolio,
-} from '@/lib/portfolio-vault';
+import { usePrivacy } from '@/context/PrivacyContext';
+import { loadUserPortfolio, saveUserPortfolio } from '@/lib/portfolio-vault';
 
 export default function SnapshotsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { maskValue } = usePrivacy();
 
   const [currency, setCurrency] = useState('INR');
   const [loading, setLoading] = useState(true);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [liabilities, setLiabilities] = useState<Liability[]>([]);
-  const [saveStatus, setSaveStatus] = useState<string>('');
-  const [customLabel, setCustomLabel] = useState('');
+  const [filterView, setFilterView] = useState<'networth' | 'assets' | 'liabilities'>('networth');
 
-  // Redirect to login if user is not signed in
+  // Manual past entry modal
+  const [isPastModalOpen, setIsPastModalOpen] = useState(false);
+  const [pastDate, setPastDate] = useState(() => new Date().toISOString().slice(0, 7));
+  const [pastNetWorth, setPastNetWorth] = useState('');
+  const [pastLabel, setPastLabel] = useState('');
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login?redirect=/snapshots');
     }
   }, [user, authLoading, router]);
 
-  // Load user's private encrypted vault
   useEffect(() => {
     async function initVault() {
       if (!user) return;
@@ -65,215 +63,196 @@ export default function SnapshotsPage() {
     initVault();
   }, [user]);
 
-  // Save changes to encrypted vault
   const persistChanges = async (updatedSnapshots: Snapshot[]) => {
     if (!user) return;
     setSnapshots(updatedSnapshots);
-    setSaveStatus('Encrypting & Saving...');
     try {
       const currentVault = await loadUserPortfolio(user.id, user.email);
       await saveUserPortfolio({
         ...currentVault,
         currency,
         snapshots: updatedSnapshots,
+        updatedAt: new Date().toISOString(),
       });
-      setSaveStatus('Encrypted & Synced');
-      setTimeout(() => setSaveStatus(''), 2500);
     } catch (err) {
       console.error('Error saving snapshots:', err);
-      setSaveStatus('Save Failed');
     }
   };
 
-  // Record a new snapshot from current live portfolio
-  const handleRecordSnapshot = async () => {
-    const totalAssets = assets.reduce(
-      (sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency),
-      0
-    );
-    const totalLiab = liabilities.reduce(
-      (sum, l) => sum + convertAmount(l.outstandingAmount, l.currency, currency),
-      0
-    );
-    const netWorth = totalAssets - totalLiab;
+  const currentTotalAssets = useMemo(() => {
+    return assets.reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
+  }, [assets, currency]);
 
+  const currentTotalLiab = useMemo(() => {
+    return liabilities.reduce((sum, l) => sum + convertAmount(l.outstandingAmount, l.currency, currency), 0);
+  }, [liabilities, currency]);
+
+  const currentNetWorth = currentTotalAssets - currentTotalLiab;
+
+  const handleRecordSnapshot = async () => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
     const newSnapshot: Snapshot = {
-      id: 'snap_' + Math.random().toString(36).substring(2, 9),
-      takenAt: new Date().toISOString().slice(0, 7), // YYYY-MM
-      label: customLabel.trim() || `Snapshot ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
-      totalAssetsBase: Math.round(totalAssets),
-      totalLiabilitiesBase: Math.round(totalLiab),
-      netWorthBase: Math.round(netWorth),
+      id: `snap_${Date.now()}`,
+      takenAt: currentMonth,
+      label: `Checkpoint ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
+      totalAssetsBase: Math.round(currentTotalAssets),
+      totalLiabilitiesBase: Math.round(currentTotalLiab),
+      netWorthBase: Math.round(currentNetWorth),
       baseCurrency: currency,
     };
 
-    // Replace if same month exists or prepend
     const updated = [newSnapshot, ...snapshots.filter((s) => s.takenAt !== newSnapshot.takenAt)];
     await persistChanges(updated);
-    setCustomLabel('');
+  };
+
+  const handleAddPastEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(pastNetWorth);
+    if (!val || isNaN(val)) return;
+
+    const newSnap: Snapshot = {
+      id: `snap_past_${Date.now()}`,
+      takenAt: pastDate,
+      label: pastLabel.trim() || `Historical Entry (${pastDate})`,
+      totalAssetsBase: Math.round(val),
+      totalLiabilitiesBase: 0,
+      netWorthBase: Math.round(val),
+      baseCurrency: currency,
+    };
+
+    const updated = [...snapshots.filter((s) => s.takenAt !== pastDate), newSnap].sort((a, b) =>
+      b.takenAt.localeCompare(a.takenAt)
+    );
+    await persistChanges(updated);
+    setIsPastModalOpen(false);
+    setPastNetWorth('');
+    setPastLabel('');
   };
 
   const handleDeleteSnapshot = async (id: string) => {
-    if (confirm('Delete this historical checkpoint?')) {
-      const filtered = snapshots.filter((s) => s.id !== id);
-      await persistChanges(filtered);
-    }
+    const filtered = snapshots.filter((s) => s.id !== id);
+    await persistChanges(filtered);
   };
-
-  // Export snapshots to CSV
-  const handleExportCSV = () => {
-    if (snapshots.length === 0) return;
-    const headers = ['Month', 'Label', 'Total Assets', 'Total Liabilities', 'Net Worth', 'Currency'];
-    const rows = snapshots.map((s) => [
-      s.takenAt,
-      `"${s.label || ''}"`,
-      s.totalAssetsBase,
-      s.totalLiabilitiesBase,
-      s.netWorthBase,
-      s.baseCurrency,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `finvelayudham_snapshots_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Computations
-  const sortedSnapshots = useMemo(() => {
-    return [...snapshots].sort((a, b) => b.takenAt.localeCompare(a.takenAt));
-  }, [snapshots]);
-
-  const latestNetWorth = sortedSnapshots[0]?.netWorthBase || 0;
-  const oldestNetWorth = sortedSnapshots[sortedSnapshots.length - 1]?.netWorthBase || 0;
-  const overallGrowth = latestNetWorth - oldestNetWorth;
-  const overallGrowthPct = oldestNetWorth > 0 ? (overallGrowth / oldestNetWorth) * 100 : 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <Navbar currentCurrency={currency} onCurrencyChange={setCurrency} />
+    <AppLayout
+      currency={currency}
+      onCurrencyChange={setCurrency}
+      title="Snapshots"
+      onTakeSnapshot={handleRecordSnapshot}
+    >
+      <div className="space-y-6">
+        {/* Wealth Sub-Navigation */}
+        <WealthSubNav />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+        {/* Top Header: Title, Subtitle & Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">
-                Net Worth Snapshots
-              </h1>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Historical Timeline
+            <div className="flex items-center gap-2">
+              <h1 className="font-serif text-2xl font-bold text-foreground">Snapshots</h1>
+              <span className="text-xs text-muted-foreground font-mono">
+                {snapshots.length} {snapshots.length === 1 ? 'checkpoint' : 'checkpoints'}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Monthly checkpoints of your assets, liabilities, and true wealth progression.
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Record periodic checkpoints to measure compounding returns and debt reduction.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {saveStatus && (
-              <span className="text-xs font-medium text-primary animate-pulse">
-                {saveStatus}
-              </span>
-            )}
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleExportCSV}
-              className="inline-flex items-center gap-2 px-3.5 py-2 border border-border rounded-lg text-xs font-semibold text-foreground hover:bg-muted shadow-xs transition-colors"
+              onClick={() => setIsPastModalOpen(true)}
+              className="px-3 py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
             >
-              <Download className="w-4 h-4" />
-              Export CSV
+              Add Historical
+            </button>
+            <button
+              onClick={handleRecordSnapshot}
+              className="px-4 py-2 rounded-xl bg-[#134e35] hover:bg-[#0f3d2a] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Take New Snapshot</span>
             </button>
           </div>
         </div>
 
-        {/* Snapshot Recording Bar */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex-1 max-w-md">
-            <input
-              type="text"
-              placeholder="Snapshot label (optional, e.g. Year-end appraisal, Bonus credited)"
-              value={customLabel}
-              onChange={(e) => setCustomLabel(e.target.value)}
-              className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
+        {/* Secondary View Toggle: Net Worth | Assets | Liabilities */}
+        <div className="flex items-center gap-1.5 border-b border-border/80 pb-2">
           <button
-            onClick={handleRecordSnapshot}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2 bg-primary text-primary-foreground font-semibold rounded-lg text-xs shadow hover:bg-primary/90 transition-all whitespace-nowrap"
+            onClick={() => setFilterView('networth')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+              filterView === 'networth'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
           >
-            <Camera className="w-4 h-4" />
-            Record Snapshot Today
+            Net Worth
+          </button>
+          <button
+            onClick={() => setFilterView('assets')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+              filterView === 'assets'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            Assets
+          </button>
+          <button
+            onClick={() => setFilterView('liabilities')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+              filterView === 'liabilities'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            Liabilities
           </button>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Latest Recorded Net Worth
+        {/* Your Current Net Worth Card matching Image 4 */}
+        <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+            Your Current Net Worth
+          </span>
+          <div className="text-3xl sm:text-4xl font-serif font-bold text-foreground mb-3">
+            {maskValue(formatCurrency(currentNetWorth, currency))}
+          </div>
+
+          <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+            <div>
+              Assets: <span className="font-semibold text-foreground">{maskValue(formatCurrency(currentTotalAssets, currency))}</span>
             </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {formatCurrency(latestNetWorth, currency)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {sortedSnapshots[0]?.takenAt || 'No snapshots yet'}
+            <div>
+              Liabilities: <span className="font-semibold text-destructive">{maskValue(formatCurrency(currentTotalLiab, currency))}</span>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Total Wealth Growth
-            </div>
-            <div
-              className={`font-serif text-2xl font-bold ${
-                overallGrowth >= 0 ? 'text-primary' : 'text-destructive'
-              }`}
+          <p className="text-xs text-muted-foreground max-w-xl leading-relaxed mb-4">
+            Snapshots record your net worth at a point in time so you can track growth over months.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleRecordSnapshot}
+              className="px-4 py-2 rounded-xl bg-[#134e35] hover:bg-[#0f3d2a] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
-              {overallGrowth >= 0 ? '+' : ''}
-              {formatCurrency(overallGrowth, currency)}
-            </div>
-            <div
-              className={`text-xs font-semibold mt-1 flex items-center gap-1 ${
-                overallGrowthPct >= 0 ? 'text-primary' : 'text-destructive'
-              }`}
+              Take Your First Snapshot
+            </button>
+            <button
+              onClick={() => setIsPastModalOpen(true)}
+              className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
             >
-              {overallGrowthPct >= 0 ? (
-                <TrendingUp className="w-3.5 h-3.5" />
-              ) : (
-                <TrendingDown className="w-3.5 h-3.5" />
-              )}
-              {overallGrowthPct.toFixed(1)}% since inception
-            </div>
+              Add Past Entry
+            </button>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Checkpoints Logged
-            </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {snapshots.length}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">Recorded monthly logs</div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Tracking Consistency
-            </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {snapshots.length >= 6 ? 'Excellent' : 'Getting Started'}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {snapshots.length >= 6 ? 'Rich trend history' : 'Add 1 snapshot per month'}
-            </div>
-          </div>
+          <p className="text-[11px] text-muted-foreground/80 mt-3">
+            Tracked your net worth somewhere else before this? Add past entries so your chart starts with full history.
+          </p>
         </div>
 
-        {/* Historical Interactive Chart */}
+        {/* Interactive Growth Curve */}
         {snapshots.length > 0 && (
           <InteractiveAreaChart
             snapshots={snapshots}
@@ -282,104 +261,142 @@ export default function SnapshotsPage() {
           />
         )}
 
-        {/* Snapshots Table */}
-        <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+        {/* Historical Snapshots Table */}
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
           <div className="p-4 border-b border-border flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Historical Log Table ({snapshots.length})
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
+              Historical Checkpoints ({snapshots.length})
             </h2>
-            <div className="text-xs text-muted-foreground">Values shown in {currency}</div>
+            <div className="text-xs text-muted-foreground">Base Currency: {currency}</div>
           </div>
 
           {snapshots.length === 0 ? (
-            <div className="text-center py-16 px-4">
-              <BarChart3 className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-foreground">No checkpoints recorded</h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                Record your first snapshot above to start tracking your net worth trajectory.
+            <div className="text-center py-12 px-4">
+              <BarChart3 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
+              <h3 className="text-sm font-semibold text-foreground">No checkpoints recorded yet</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Click "Take New Snapshot" to capture your current net worth checkpoint.
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/40 text-xs font-semibold text-muted-foreground border-b border-border">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/40 border-b border-border uppercase tracking-wider text-muted-foreground font-semibold">
                   <tr>
-                    <th className="py-3 px-4">Month</th>
-                    <th className="py-3 px-4">Checkpoint Label</th>
-                    <th className="py-3 px-4 text-right">Total Assets</th>
-                    <th className="py-3 px-4 text-right">Liabilities</th>
-                    <th className="py-3 px-4 text-right">Net Worth</th>
-                    <th className="py-3 px-4 text-right">MoM Change</th>
-                    <th className="py-3 px-4 text-center">Actions</th>
+                    <th className="p-4">Checkpoint Date</th>
+                    <th className="p-4">Label</th>
+                    <th className="p-4 text-right">Assets</th>
+                    <th className="p-4 text-right">Liabilities</th>
+                    <th className="p-4 text-right">Net Worth</th>
+                    <th className="p-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {sortedSnapshots.map((snap, idx) => {
-                    const prev = sortedSnapshots[idx + 1];
-                    const momChange = prev ? snap.netWorthBase - prev.netWorthBase : 0;
-                    const momPct = prev && prev.netWorthBase > 0 ? (momChange / prev.netWorthBase) * 100 : 0;
-
-                    return (
-                      <tr key={snap.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-semibold text-foreground flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-primary" />
-                          <span>{snap.takenAt}</span>
-                        </td>
-
-                        <td className="py-3.5 px-4 text-xs text-muted-foreground">
-                          {snap.label || 'Monthly Snapshot'}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">
-                          {formatCurrency(snap.totalAssetsBase, currency)}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">
-                          {snap.totalLiabilitiesBase > 0
-                            ? formatCurrency(snap.totalLiabilitiesBase, currency)
-                            : '₹0'}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-foreground">
-                          {formatCurrency(snap.netWorthBase, currency)}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right font-mono text-xs">
-                          {prev ? (
-                            <span
-                              className={`font-semibold ${
-                                momChange >= 0 ? 'text-primary' : 'text-destructive'
-                              }`}
-                            >
-                              {momChange >= 0 ? '+' : ''}
-                              {formatCurrency(momChange, currency)} ({momPct >= 0 ? '+' : ''}
-                              {momPct.toFixed(1)}%)
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-center">
-                          <button
-                            onClick={() => handleDeleteSnapshot(snap.id)}
-                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                            title="Delete Snapshot"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {snapshots.map((snap) => (
+                    <tr key={snap.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="p-4 font-mono font-medium text-foreground">{snap.takenAt}</td>
+                      <td className="p-4 text-muted-foreground">{snap.label || 'Monthly Checkpoint'}</td>
+                      <td className="p-4 text-right font-mono text-muted-foreground">
+                        {maskValue(formatCurrency(snap.totalAssetsBase, currency))}
+                      </td>
+                      <td className="p-4 text-right font-mono text-destructive">
+                        {maskValue(formatCurrency(snap.totalLiabilitiesBase, currency))}
+                      </td>
+                      <td className="p-4 text-right font-mono font-bold text-primary">
+                        {maskValue(formatCurrency(snap.netWorthBase, currency))}
+                      </td>
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => handleDeleteSnapshot(snap.id)}
+                          className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
         </div>
-      </main>
+      </div>
 
-      <Footer />
-    </div>
+      {/* Modal for adding historical / past entry */}
+      {isPastModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="font-serif text-lg font-bold text-foreground">Add Past Checkpoint</h3>
+              <button
+                onClick={() => setIsPastModalOpen(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPastEntry} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                  Month / Year *
+                </label>
+                <input
+                  type="month"
+                  required
+                  value={pastDate}
+                  onChange={(e) => setPastDate(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                  Net Worth Value ({currency}) *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  placeholder="e.g. 2500000"
+                  value={pastNetWorth}
+                  onChange={(e) => setPastNetWorth(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                  Checkpoint Label (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Year End 2025"
+                  value={pastLabel}
+                  onChange={(e) => setPastLabel(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPastModalOpen(false)}
+                  className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Add Checkpoint
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </AppLayout>
   );
 }
