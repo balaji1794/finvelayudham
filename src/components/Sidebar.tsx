@@ -64,8 +64,24 @@ export default function Sidebar({
   const isActive = (path: string) => {
     if (!pathname) return false;
     if (path === '/dashboard') return pathname === '/dashboard';
-    if (path === '/wealth') return pathname === '/wealth' || pathname === '/assets' || pathname === '/allocation' || pathname === '/snapshots';
-    if (path === '/money') return pathname === '/money' || pathname === '/cashflow';
+    if (path === '/assets') {
+      return (
+        pathname === '/assets' ||
+        pathname === '/wealth' ||
+        pathname === '/allocation' ||
+        pathname === '/liabilities' ||
+        pathname === '/snapshots'
+      );
+    }
+    if (path === '/transactions') {
+      return (
+        pathname === '/transactions' ||
+        pathname === '/money' ||
+        pathname === '/accounts' ||
+        pathname === '/budget' ||
+        pathname.startsWith('/money/')
+      );
+    }
     if (path === '/essentials') return pathname === '/essentials' || pathname === '/goals';
     return typeof pathname.startsWith === 'function' ? pathname.startsWith(path) : false;
   };
@@ -237,12 +253,12 @@ export default function Sidebar({
               <span>Overview</span>
             </Link>
 
-            <Link href="/wealth" className={navClasses('/wealth')}>
+            <Link href="/assets" className={navClasses('/assets')}>
               <TrendingUp className="w-4 h-4" />
               <span>Wealth</span>
             </Link>
 
-            <Link href="/money" className={navClasses('/money')}>
+            <Link href="/transactions" className={navClasses('/transactions')}>
               <Wallet className="w-4 h-4" />
               <span>Money</span>
             </Link>

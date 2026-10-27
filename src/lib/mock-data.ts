@@ -42,6 +42,9 @@ export interface Transaction {
   date: string;
   isRecurring: boolean;
   description: string;
+  merchant?: string;
+  account?: string;
+  currency?: string;
 }
 
 export const INITIAL_ASSETS: Asset[] = [

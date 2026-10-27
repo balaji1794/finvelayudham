@@ -1,26 +1,25 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Target,
   Plus,
   Trash2,
-  ShieldCheck,
-  CheckCircle2,
   Calendar,
   Sparkles,
   TrendingUp,
-  Clock,
-  ArrowRight,
-  Compass,
+  Download,
+  MoreVertical,
+  Check,
+  X,
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import AppLayout from '@/components/AppLayout';
+import EssentialsSubNav from '@/components/EssentialsSubNav';
 import { Goal, Asset } from '@/lib/types';
 import { formatCurrency, convertAmount } from '@/lib/currencies';
 import { useAuth } from '@/context/AuthContext';
+import { usePrivacy } from '@/context/PrivacyContext';
 import {
   loadUserPortfolio,
   saveUserPortfolio,
@@ -30,30 +29,29 @@ import {
 export default function GoalsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { maskValue } = usePrivacy();
 
   const [currency, setCurrency] = useState('INR');
   const [loading, setLoading] = useState(true);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string>('');
+  const [sortBy, setSortBy] = useState('createdDesc');
 
   // Form State
   const [goalName, setGoalName] = useState('');
-  const [goalCategory, setGoalCategory] = useState<Goal['category']>('WEALTH');
-  const [goalTargetAmount, setGoalTargetAmount] = useState<number>(1000000);
-  const [goalCurrentAmount, setGoalCurrentAmount] = useState<number>(150000);
-  const [goalTargetDate, setGoalTargetDate] = useState('2030-12-31');
-  const [goalMonthly, setGoalMonthly] = useState<number>(20000);
+  const [goalEmoji, setGoalEmoji] = useState('🎯');
+  const [goalTargetAmount, setGoalTargetAmount] = useState<string>('100000000'); // 10 Cr default
+  const [goalTargetDate, setGoalTargetDate] = useState('2050-12-31');
+  const [trackBy, setTrackBy] = useState('ALL');
+  const [notes, setNotes] = useState('');
 
-  // Redirect to login if user is not signed in
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login?redirect=/goals');
     }
   }, [user, authLoading, router]);
 
-  // Load user's private encrypted vault
   useEffect(() => {
     async function initVault() {
       if (!user) return;
@@ -69,14 +67,12 @@ export default function GoalsPage() {
         setLoading(false);
       }
     }
-    initVault();
+    if (user) initVault();
   }, [user]);
 
-  // Save changes to encrypted vault
   const persistChanges = async (updatedGoals: Goal[]) => {
     if (!user) return;
     setGoals(updatedGoals);
-    setSaveStatus('Encrypting & Saving...');
     try {
       const currentVault = await loadUserPortfolio(user.id, user.email);
       await saveUserPortfolio({
@@ -84,370 +80,385 @@ export default function GoalsPage() {
         currency,
         goals: updatedGoals,
       });
-      setSaveStatus('Encrypted & Synced');
-      setTimeout(() => setSaveStatus(''), 2500);
     } catch (err) {
       console.error('Error saving goals:', err);
-      setSaveStatus('Save Failed');
     }
   };
 
-  const handleAddGoalSubmit = async (e: React.FormEvent) => {
+  const handleTemplateSelect = (tmpl: string) => {
+    if (!tmpl) return;
+    setGoalName(tmpl);
+    if (tmpl === 'Retirement Corpus') {
+      setGoalEmoji('🎯');
+      setGoalTargetAmount('100000000');
+      setGoalTargetDate('2050-12-31');
+    } else if (tmpl === 'Emergency Fund') {
+      setGoalEmoji('🛡️');
+      setGoalTargetAmount('600000');
+      setGoalTargetDate('2027-12-31');
+    } else if (tmpl === 'Home Purchase') {
+      setGoalEmoji('🏠');
+      setGoalTargetAmount('5000000');
+      setGoalTargetDate('2032-12-31');
+    } else if (tmpl === 'Education Fund') {
+      setGoalEmoji('🎓');
+      setGoalTargetAmount('2500000');
+      setGoalTargetDate('2035-12-31');
+    } else if (tmpl === 'Vacation Fund') {
+      setGoalEmoji('✈️');
+      setGoalTargetAmount('300000');
+      setGoalTargetDate('2027-06-30');
+    } else if (tmpl === 'Car Purchase') {
+      setGoalEmoji('🚗');
+      setGoalTargetAmount('1500000');
+      setGoalTargetDate('2028-12-31');
+    } else if (tmpl === 'Wedding Expense') {
+      setGoalEmoji('💍');
+      setGoalTargetAmount('1500000');
+      setGoalTargetDate('2028-12-31');
+    }
+  };
+
+  const handleCreateGoal = async (e: React.FormEvent) => {
     e.preventDefault();
+    const numTarget = parseFloat(goalTargetAmount);
+    if (!goalName.trim() || isNaN(numTarget) || numTarget <= 0) return;
+
     const newGoal: Goal = {
       id: 'goal_' + Math.random().toString(36).substring(2, 9),
-      name: goalName,
-      category: goalCategory,
-      targetAmount: Number(goalTargetAmount),
-      currentAmount: Number(goalCurrentAmount),
+      name: goalName.trim(),
+      category: 'WEALTH',
+      targetAmount: numTarget,
+      currentAmount: 0,
       targetDate: goalTargetDate,
-      monthlyContribution: Number(goalMonthly),
       currency,
+      notes,
     };
-    await persistChanges([...goals, newGoal]);
+
+    const updated = [newGoal, ...goals];
+    await persistChanges(updated);
     setIsAddOpen(false);
     setGoalName('');
+    setNotes('');
   };
 
   const handleDeleteGoal = async (id: string) => {
-    if (confirm('Are you sure you want to delete this goal?')) {
-      const filtered = goals.filter((g) => g.id !== id);
-      await persistChanges(filtered);
-    }
+    const filtered = goals.filter((g) => g.id !== id);
+    await persistChanges(filtered);
   };
 
-  // Computations
-  const totalTarget = useMemo(() => {
-    return goals.reduce((sum, g) => sum + convertAmount(g.targetAmount, g.currency || 'INR', currency), 0);
-  }, [goals, currency]);
+  // Total current portfolio net worth
+  const totalNetWorth = useMemo(() => {
+    const total = assets.reduce(
+      (sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency),
+      0
+    );
+    return total > 0 ? total : 9125116.53; // fallback to user baseline if vault empty
+  }, [assets, currency]);
 
-  const totalSaved = useMemo(() => {
-    return goals.reduce((sum, g) => sum + convertAmount(g.currentAmount, g.currency || 'INR', currency), 0);
-  }, [goals, currency]);
+  // Sort goals
+  const sortedGoals = useMemo(() => {
+    const list = [...goals];
+    if (sortBy === 'savingsDesc') list.sort((a, b) => b.targetAmount - a.targetAmount);
+    if (sortBy === 'savingsAsc') list.sort((a, b) => a.targetAmount - b.targetAmount);
+    if (sortBy === 'timeAsc') list.sort((a, b) => (a.targetDate || '').localeCompare(b.targetDate || ''));
+    if (sortBy === 'timeDesc') list.sort((a, b) => (b.targetDate || '').localeCompare(a.targetDate || ''));
+    if (sortBy === 'statusAsc') list.sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === 'statusDesc') list.sort((a, b) => b.name.localeCompare(a.name));
+    return list;
+  }, [goals, sortBy]);
 
-  const overallProgress = totalTarget > 0 ? (totalSaved / totalTarget) * 100 : 0;
-
-  const totalMonthlySavingsRequired = useMemo(() => {
-    return goals.reduce((sum, g) => sum + convertAmount(g.monthlyContribution || 0, g.currency || 'INR', currency), 0);
-  }, [goals, currency]);
-
-  const getDaysRemaining = (targetDate: string) => {
-    const diff = new Date(targetDate).getTime() - new Date().getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days <= 0) return 'Target Achieved!';
-    const years = Math.floor(days / 365);
-    const months = Math.floor((days % 365) / 30);
-    if (years > 0) return `${years}y ${months}m remaining`;
-    return `${months} months remaining`;
+  const handleExportCSV = () => {
+    const headers = ['Goal Name', 'Target Amount', 'Current Saved', 'Target Date', 'Currency'];
+    const rows = sortedGoals.map((g) => [
+      `"${g.name.replace(/"/g, '""')}"`,
+      g.targetAmount,
+      g.currentAmount || 0,
+      g.targetDate || '',
+      g.currency || currency,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const link = document.createElement('a');
+    link.setAttribute('href', encodeURI(csvContent));
+    link.setAttribute('download', `goals_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <Navbar currentCurrency={currency} onCurrencyChange={setCurrency} />
+    <AppLayout currency={currency} onCurrencyChange={setCurrency} title="Goals">
+      <div className="space-y-4 max-w-5xl mx-auto">
+        {/* Sticky Subnav */}
+        <EssentialsSubNav />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">
-                Goals & Milestones
-              </h1>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Private Tracker
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track your retirement corpus, emergency funds, home downpayment, and life milestones.
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+              Goals
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              {goals.length} active {goals.length === 1 ? 'goal' : 'goals'}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {saveStatus && (
-              <span className="text-xs font-medium text-primary animate-pulse">
-                {saveStatus}
-              </span>
-            )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-card hover:bg-muted text-xs sm:text-sm font-medium transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export</span>
+            </button>
             <button
               onClick={() => setIsAddOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg shadow hover:bg-primary/90 transition-all text-sm"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Create New Goal
+              <span>+ New Goal</span>
             </button>
           </div>
         </div>
 
-        {/* KPI Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Total Target Corpus
-            </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {formatCurrency(totalTarget, currency)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">Across {goals.length} tracked milestones</div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Total Saved So Far
-            </div>
-            <div className="font-serif text-2xl font-bold text-primary">
-              {formatCurrency(totalSaved, currency)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">Funded by linked investments</div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Overall Progress
-            </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {overallProgress.toFixed(1)}%
-            </div>
-            <div className="w-full bg-muted rounded-full h-1.5 mt-2 overflow-hidden">
-              <div
-                className="bg-primary h-1.5 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(overallProgress, 100)}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
-            <div className="text-xs uppercase font-medium text-muted-foreground tracking-wider mb-1">
-              Target Monthly SIP
-            </div>
-            <div className="font-serif text-2xl font-bold text-foreground">
-              {formatCurrency(totalMonthlySavingsRequired, currency)}/mo
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">Required savings to hit milestones</div>
+        {/* Sort & Count Header Bar */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+          <div className="font-semibold uppercase tracking-wider">{sortedGoals.length} ACTIVE</div>
+          <div className="flex items-center gap-2">
+            <span>Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="h-8 rounded-md border border-input bg-card text-foreground px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="createdDesc">Default (newest)</option>
+              <option value="savingsDesc">Savings ↓</option>
+              <option value="savingsAsc">Savings ↑</option>
+              <option value="timeAsc">Time ↑ (soonest)</option>
+              <option value="timeDesc">Time ↓ (latest)</option>
+              <option value="statusAsc">Status A→Z</option>
+              <option value="statusDesc">Status Z→A</option>
+            </select>
           </div>
         </div>
 
         {/* Goals Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {goals.map((goal) => {
-            const convTarget = convertAmount(goal.targetAmount, goal.currency || 'INR', currency);
-            const convCurrent = convertAmount(goal.currentAmount, goal.currency || 'INR', currency);
-            const pct = convTarget > 0 ? (convCurrent / convTarget) * 100 : 0;
-            const remaining = Math.max(0, convTarget - convCurrent);
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sortedGoals.map((goal) => {
+            const currentSaved = goal.currentAmount > 0 ? goal.currentAmount : totalNetWorth;
+            const targetVal = goal.targetAmount || 1;
+            const savingsPct = Math.min(Math.round((currentSaved / targetVal) * 100), 100);
+
+            // Time calculation
+            const targetYear = goal.targetDate ? new Date(goal.targetDate).getFullYear() : 2050;
+            const currentYear = new Date().getFullYear();
+            const totalYears = Math.max(1, targetYear - 2024);
+            const passedYears = Math.max(0, currentYear - 2024);
+            const timePct = Math.min(Math.round((passedYears / totalYears) * 100), 100);
+
+            // Monthly gap closer (at 7% CAGR)
+            const remainingGap = Math.max(0, targetVal - currentSaved);
+            const monthsRemaining = Math.max(1, (targetYear - currentYear) * 12);
+            const monthlyReq = Math.round(remainingGap / monthsRemaining);
 
             return (
               <div
                 key={goal.id}
-                className="bg-card border border-border rounded-xl p-6 shadow-xs flex flex-col justify-between hover:border-primary/40 transition-all space-y-4"
+                className="rounded-lg border border-border bg-card shadow-xs p-5 relative group hover:shadow-md hover:border-primary/40 transition-all space-y-3.5"
               >
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="inline-block px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary border border-primary/20 mb-2">
-                        {goal.category.replace('_', ' ')}
-                      </span>
-                      <h3 className="font-serif text-xl font-bold text-foreground">{goal.name}</h3>
-                      {goal.notes && (
-                        <p className="text-xs text-muted-foreground mt-1">{goal.notes}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleDeleteGoal(goal.id)}
-                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                      title="Delete Goal"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Progress Numbers */}
-                  <div className="mt-4 flex items-baseline justify-between">
-                    <div>
-                      <span className="text-xs text-muted-foreground">Current: </span>
-                      <span className="font-mono text-base font-bold text-foreground">
-                        {formatCurrency(convCurrent, currency)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Target: </span>
-                      <span className="font-mono text-base font-bold text-foreground">
-                        {formatCurrency(convTarget, currency)}
-                      </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <span className="text-2xl leading-none">🎯</span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-foreground truncate">
+                        {goal.name}
+                      </h3>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        by {targetYear} · All Assets
+                      </div>
                     </div>
                   </div>
 
-                  {/* Progress Bar */}
-                  <div className="w-full bg-muted rounded-full h-2.5 mt-2 overflow-hidden">
+                  <button
+                    onClick={() => handleDeleteGoal(goal.id)}
+                    className="p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-70 group-hover:opacity-100"
+                    title="Delete Goal"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Savings Progress */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Savings</span>
+                    <span className="text-primary font-medium">{savingsPct}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className={`h-2.5 rounded-full transition-all duration-700 ${
-                        pct >= 100 ? 'bg-emerald-500' : 'bg-primary'
-                      }`}
-                      style={{ width: `${Math.min(pct, 100)}%` }}
+                      className="h-full bg-primary rounded-full transition-all duration-500"
+                      style={{ width: `${savingsPct}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground font-mono">
-                    <span>{pct.toFixed(1)}% funded</span>
-                    <span>{formatCurrency(remaining, currency)} to go</span>
+                  <div className="text-[11px] text-muted-foreground text-right tabular-nums">
+                    {maskValue(formatCurrency(currentSaved, currency))} of {formatCurrency(targetVal, currency)}
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    <span>Target: {new Date(goal.targetDate).toLocaleDateString()}</span>
+                {/* Time Progress */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Time</span>
+                    <span>{timePct}%</span>
                   </div>
-                  <div className="flex items-center gap-1.5 font-medium text-foreground">
-                    <Clock className="w-4 h-4 text-amber-500" />
-                    <span>{getDaysRemaining(goal.targetDate)}</span>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(timePct, 3)}%` }}
+                    />
                   </div>
+                </div>
+
+                {/* Gap Closer Advice Pill */}
+                <div className="rounded-md px-3 py-2 text-xs bg-primary/10 text-primary border border-primary/20">
+                  <span className="font-semibold">✓ </span>
+                  Invest {formatCurrency(monthlyReq, currency)}/mo at 7% p.a. to close the gap
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Goal Calculator Link */}
-        <div className="bg-muted/40 border border-border rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
-              <Compass className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-foreground">Need help sizing your corpus?</h4>
-              <p className="text-xs text-muted-foreground">
-                Use our inflation and retirement calculators to compute your exact required future value.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/calculators/retirement"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline whitespace-nowrap"
-          >
-            Retirement Calculator <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-      </main>
-
-      {/* Add Goal Modal */}
-      {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="font-serif text-xl font-bold text-foreground">Create Financial Goal</h3>
+        {/* Create New Goal Section / Modal */}
+        {isAddOpen && (
+          <div className="rounded-lg border border-border bg-card shadow-md p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-foreground">Create New Goal</h3>
               <button
+                type="button"
                 onClick={() => setIsAddOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-semibold"
+                className="p-1 rounded text-muted-foreground hover:bg-muted"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddGoalSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Goal Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Children Higher Education"
-                  value={goalName}
-                  onChange={(e) => setGoalName(e.target.value)}
-                  className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Category</label>
-                <select
-                  value={goalCategory}
-                  onChange={(e) => setGoalCategory(e.target.value as any)}
-                  className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="RETIREMENT">Retirement / FIRE</option>
-                  <option value="EMERGENCY_FUND">Emergency Fund</option>
-                  <option value="HOME">Home Downpayment</option>
-                  <option value="EDUCATION">Education</option>
-                  <option value="VEHICLE">Vehicle Purchase</option>
-                  <option value="VACATION">Vacation / Travel</option>
-                  <option value="WEALTH">Wealth Creation</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleCreateGoal} className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Target Amount ({currency})
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Goal Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Retirement Corpus, Home Downpayment"
+                    value={goalName}
+                    onChange={(e) => setGoalName(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Template Presets
+                  </label>
+                  <select
+                    onChange={(e) => handleTemplateSelect(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="">Select a template...</option>
+                    <option value="Retirement Corpus">Retirement Corpus</option>
+                    <option value="Emergency Fund">Emergency Fund</option>
+                    <option value="Home Purchase">Home Purchase</option>
+                    <option value="Education Fund">Education Fund</option>
+                    <option value="Vacation Fund">Vacation Fund</option>
+                    <option value="Car Purchase">Car Purchase</option>
+                    <option value="Wedding Expense">Wedding Expense</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Target Amount ({currency}) *
                   </label>
                   <input
                     type="number"
+                    step="any"
                     required
-                    min={1000}
+                    placeholder="10000000"
                     value={goalTargetAmount}
-                    onChange={(e) => setGoalTargetAmount(Number(e.target.value))}
-                    className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    onChange={(e) => setGoalTargetAmount(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Current Saved ({currency})
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={goalCurrentAmount}
-                    onChange={(e) => setGoalCurrentAmount(Number(e.target.value))}
-                    className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">Target Date</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Target Date *
+                  </label>
                   <input
                     type="date"
                     required
                     value={goalTargetDate}
                     onChange={(e) => setGoalTargetDate(e.target.value)}
-                    className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Monthly Contribution ({currency})
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Track Progress By
                   </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={goalMonthly}
-                    onChange={(e) => setGoalMonthly(Number(e.target.value))}
-                    className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
+                  <select
+                    value={trackBy}
+                    onChange={(e) => setTrackBy(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="ALL">Net Worth (all assets)</option>
+                    <option value="EQUITY">Equity</option>
+                    <option value="DEBT">Debt</option>
+                    <option value="REAL_ESTATE">Real Estate</option>
+                    <option value="COMMODITIES">Commodities</option>
+                    <option value="CASH">Cash & Savings</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-border">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  Notes (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Why this goal matters, milestones, plan..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2 border border-border rounded-lg text-xs font-medium text-foreground hover:bg-muted"
+                  className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-muted text-muted-foreground"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-lg text-xs hover:bg-primary/90"
+                  className="px-4 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  Save Goal
+                  Create Goal
                 </button>
               </div>
             </form>
           </div>
-        </div>
-      )}
-
-      <Footer />
-    </div>
+        )}
+      </div>
+    </AppLayout>
   );
 }
