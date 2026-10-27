@@ -5,6 +5,7 @@
 @layer base {
   :root {
     --radius: 0.375rem;
+    --font-scale: 1;
     --background: #f7f6f3;
     --foreground: #1a1916;
     --card: #ffffff;
@@ -25,13 +26,37 @@
     --input: #e2ded6;
     --ring: #2c6e49;
 
+    /* Signature FinBoom / Selvam color tokens */
+    --selvam-accent: #2c6e49;
+    --selvam-accent-light: #e8f2ec;
+    --selvam-surface-2: #f0eee9;
+    --selvam-text-2: #2e2b26;
+    --selvam-text-3: #55514b;
+    --selvam-red: #c0392b;
+    --selvam-red-light: #fdecea;
+    --selvam-amber: #92400e;
+    --selvam-amber-light: #fef3dc;
+    --selvam-blue: #1e4d8c;
+    --selvam-blue-light: #eaf0fa;
+    --selvam-green: #166534;
+    --selvam-green-light: #e6f4ec;
+
+    /* Sidebar tokens */
+    --sidebar: #ffffff;
+    --sidebar-foreground: #1a1916;
+    --sidebar-primary: #2c6e49;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e8f2ec;
+    --sidebar-accent-foreground: #2c6e49;
+    --sidebar-border: #e2ded6;
+
     /* Asset class tokens */
     --asset-equity: #2563eb;
     --asset-debt: #0d9488;
     --asset-real-estate: #ea580c;
     --asset-commodities: #ca8a04;
     --asset-cash: #475569;
-    --asset-crypto: #7c3aed;
+    --asset-crypto: #4f46e5;
     --asset-alternatives: #9333ea;
     --asset-other: #78716c;
 
@@ -60,6 +85,30 @@
     --input: #2e2c27;
     --ring: #4a9e6e;
 
+    /* Signature FinBoom / Selvam color tokens dark */
+    --selvam-accent: #4a9e6e;
+    --selvam-accent-light: #1a2e22;
+    --selvam-surface-2: #252420;
+    --selvam-text-2: #d5d1ca;
+    --selvam-text-3: #a9a49d;
+    --selvam-red: #e05c50;
+    --selvam-red-light: #2a1a18;
+    --selvam-amber: #d4a030;
+    --selvam-amber-light: #2a2010;
+    --selvam-blue: #4a7ec4;
+    --selvam-blue-light: #1a2235;
+    --selvam-green: #4aba7a;
+    --selvam-green-light: #1a2e22;
+
+    /* Sidebar tokens dark */
+    --sidebar: #1c1b19;
+    --sidebar-foreground: #f0ede6;
+    --sidebar-primary: #4a9e6e;
+    --sidebar-primary-foreground: #111110;
+    --sidebar-accent: #1a2e22;
+    --sidebar-accent-foreground: #4a9e6e;
+    --sidebar-border: #2e2c27;
+
     /* Asset class tokens dark */
     --asset-equity: #3b82f6;
     --asset-debt: #14b8a6;
@@ -78,11 +127,26 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.font-serif {
+.font-serif, .font-display {
   font-family: "DM Serif Display", Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+.number, .tabular {
+  font-feature-settings: "tnum" 1, "zero" 1, "cv11" 1, "ss01" 1;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+.text-micro {
+  font-size: 0.625rem;
+  line-height: 1.2;
+}
+
+.text-label {
+  font-size: 0.6875rem;
+  line-height: 1.25;
 }

@@ -54,8 +54,8 @@ export default function AppLayout({
         onTakeSnapshot={onTakeSnapshot}
       />
 
-      {/* Main Content Area (offset on desktop by sidebar width 256px) */}
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      {/* Main Content Area (offset on desktop by sidebar width 220px) */}
+      <div className="lg:pl-[220px] flex flex-col min-h-screen">
         <HeaderBar
           onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           currency={currency}

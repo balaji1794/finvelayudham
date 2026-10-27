@@ -74,7 +74,7 @@ export default function HeaderBar({
   const displayEmail = user?.email || 'sharmashreedx333@gmail.com';
 
   return (
-    <header className="sticky top-0 z-30 h-16 w-full border-b border-border bg-card/90 backdrop-blur-md flex items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-30 h-12 w-full border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6">
       {/* Left: Mobile Sidebar Trigger + Optional Page Title */}
       <div className="flex items-center gap-3">
         <button

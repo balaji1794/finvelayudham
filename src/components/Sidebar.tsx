@@ -92,11 +92,11 @@ export default function Sidebar({
   };
 
   const navClasses = (path: string) => `
-    flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all select-none
+    flex items-center gap-3 px-3 min-h-11 rounded-lg text-sm font-medium transition-colors select-none
     ${
       isActive(path)
-        ? 'bg-emerald-50 text-emerald-900 font-bold dark:bg-emerald-950/50 dark:text-emerald-300 shadow-xs'
-        : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+        ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-xs'
+        : 'text-foreground/70 hover:bg-muted hover:text-foreground active:bg-muted'
     }
   `;
 
@@ -112,31 +112,29 @@ export default function Sidebar({
 
       {/* Main Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 w-64 border-r border-border bg-card flex flex-col justify-between transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-40 w-[220px] shrink-0 border-r border-border bg-card flex flex-col justify-between transition-transform duration-200 ease-in-out lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+        <div className="flex-1 overflow-y-auto flex flex-col">
           {/* Logo */}
-          <div className="flex items-center justify-between px-2">
-            <Link href="/dashboard" className="flex items-center gap-1.5 group">
-              <span className="font-serif text-2xl font-bold tracking-tight text-foreground transition-transform group-hover:scale-[1.02]">
+          <div className="p-5 pb-4">
+            <Link href="/dashboard" className="flex items-center gap-2 group">
+              <span className="font-serif text-xl tracking-tight text-foreground transition-transform group-hover:scale-[1.02]">
                 FinVelayudham<span className="text-primary font-sans">.</span>
               </span>
             </Link>
           </div>
 
           {/* "+ Add" Dropdown CTA */}
-          <div className="relative" ref={addDropdownRef}>
+          <div className="px-3 pb-3 relative" ref={addDropdownRef}>
             <button
               onClick={() => setAddDropdownOpen(!addDropdownOpen)}
-              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#134e35] hover:bg-[#0f3d2a] text-white font-semibold text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+              className="flex w-full items-center gap-2 rounded-lg bg-primary px-3 min-h-11 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
             >
-              <span className="flex items-center gap-2">
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>Add</span>
-              </span>
-              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${addDropdownOpen ? 'rotate-180' : ''}`} />
+              <Plus className="h-5 w-5 shrink-0" />
+              <span className="flex-1 text-left">Add</span>
+              <ChevronDown className={`h-3.5 w-3.5 shrink-0 opacity-70 transition-transform duration-200 ${addDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown Menu */}
