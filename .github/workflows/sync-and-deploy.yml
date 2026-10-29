@@ -32,7 +32,11 @@ jobs:
       - name: Start Next.js Test Server
         run: |
           npx next start -p 3005 &
-          sleep 4
+          for i in $(seq 1 30); do
+            curl -sI http://127.0.0.1:3005 > /dev/null && echo "Next.js test server ready on port 3005" && break
+            echo "Waiting for Next.js server to start ($i/30)..."
+            sleep 1
+          done
 
       - name: Run Automated Test Suite
         run: npm test

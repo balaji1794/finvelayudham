@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   User,
   Settings,
@@ -29,20 +29,26 @@ import {
 } from '@/lib/portfolio-vault';
 import { formatCurrency } from '@/lib/currencies';
 
-function SettingsContent() {
+export default function SettingsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialTab = (searchParams && searchParams.get('tab')) || 'account';
 
   const { user, isLoading: authLoading, logout, updateProfile } = useAuth();
   const { isPrivacyMasked, togglePrivacyMask } = usePrivacy();
 
-  const [activeTab, setActiveTab] = useState<'account' | 'preferences' | 'profiles' | 'data'>(
-    initialTab as any
-  );
+  const [activeTab, setActiveTab] = useState<'account' | 'preferences' | 'profiles' | 'data'>('account');
   const [currency, setCurrency] = useState('INR');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab && ['account', 'preferences', 'profiles', 'data'].includes(tab)) {
+        setActiveTab(tab as any);
+      }
+    }
+  }, []);
 
   // Edit Account
   const [editName, setEditName] = useState('');
@@ -450,19 +456,5 @@ function SettingsContent() {
         )}
       </div>
     </AppLayout>
-  );
-}
-
-export default function SettingsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      }
-    >
-      <SettingsContent />
-    </Suspense>
   );
 }
