@@ -49,6 +49,39 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <meta name="theme-color" content="#2c6e49" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function tryReload() {
+                  try {
+                    var k = 'fv_chunk_reload';
+                    var last = sessionStorage.getItem(k);
+                    var now = Date.now();
+                    if (!last || now - Number(last) > 8000) {
+                      sessionStorage.setItem(k, String(now));
+                      window.location.reload();
+                    }
+                  } catch(e) {
+                    window.location.reload();
+                  }
+                }
+                window.addEventListener('error', function(e) {
+                  var msg = e && (e.message || '');
+                  if (msg.indexOf('Loading chunk') !== -1 || msg.indexOf('ChunkLoadError') !== -1 || msg.indexOf('Failed to fetch dynamically imported module') !== -1) {
+                    tryReload();
+                  }
+                });
+                window.addEventListener('unhandledrejection', function(e) {
+                  var reason = e && e.reason && (e.reason.message || String(e.reason)) || '';
+                  if (reason.indexOf('Loading chunk') !== -1 || reason.indexOf('ChunkLoadError') !== -1 || reason.indexOf('Failed to fetch dynamically imported module') !== -1) {
+                    tryReload();
+                  }
+                });
+              })();
+            `,
+          }}
+        />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
         <Providers>{children}</Providers>

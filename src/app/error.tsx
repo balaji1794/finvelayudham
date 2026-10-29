@@ -21,12 +21,17 @@ export default function ErrorBoundary({
       error.message?.includes('Failed to fetch dynamically imported module');
 
     if (isChunkError && typeof window !== 'undefined') {
-      const reloadKey = 'finvelayudham_chunk_reload';
-      const lastReload = sessionStorage.getItem(reloadKey);
-      const now = Date.now();
-      // Prevent reload loops (max once every 10 seconds)
-      if (!lastReload || now - Number(lastReload) > 10000) {
-        sessionStorage.setItem(reloadKey, String(now));
+      try {
+        const reloadKey = 'finvelayudham_chunk_reload';
+        const lastReload = sessionStorage.getItem(reloadKey);
+        const now = Date.now();
+        // Prevent reload loops (max once every 8 seconds)
+        if (!lastReload || now - Number(lastReload) > 8000) {
+          sessionStorage.setItem(reloadKey, String(now));
+          window.location.reload();
+        }
+      } catch {
+        // Fallback for Brave Shields / private mode where sessionStorage is restricted
         window.location.reload();
       }
     }
