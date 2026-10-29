@@ -60,10 +60,10 @@ export default function RootLayout({
                     var now = Date.now();
                     if (!last || now - Number(last) > 8000) {
                       sessionStorage.setItem(k, String(now));
-                      window.location.reload();
+                      window.location.href = window.location.pathname + '?reload=' + now;
                     }
                   } catch(e) {
-                    window.location.reload();
+                    window.location.href = window.location.pathname + '?reload=' + Date.now();
                   }
                 }
                 window.addEventListener('error', function(e) {

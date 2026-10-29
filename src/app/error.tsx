@@ -28,11 +28,11 @@ export default function ErrorBoundary({
         // Prevent reload loops (max once every 8 seconds)
         if (!lastReload || now - Number(lastReload) > 8000) {
           sessionStorage.setItem(reloadKey, String(now));
-          window.location.reload();
+          window.location.href = window.location.pathname + '?reload=' + Date.now();
         }
       } catch {
         // Fallback for Brave Shields / private mode where sessionStorage is restricted
-        window.location.reload();
+        window.location.href = window.location.pathname + '?reload=' + Date.now();
       }
     }
   }, [error]);
@@ -58,7 +58,7 @@ export default function ErrorBoundary({
           <button
             onClick={() => {
               if (typeof window !== 'undefined') {
-                window.location.reload();
+                window.location.href = window.location.pathname + '?reload=' + Date.now();
               }
             }}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-sm"

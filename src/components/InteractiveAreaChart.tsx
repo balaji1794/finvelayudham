@@ -45,13 +45,20 @@ export default function InteractiveAreaChart({
   const chartHeight = height - paddingY * 2;
 
   const points = data.map((d, i) => {
-    const x = paddingX + (i / (data.length - 1)) * chartWidth;
+    const x = data.length <= 1 ? width / 2 : paddingX + (i / (data.length - 1)) * chartWidth;
     const y = paddingY + chartHeight - ((d.convertedNetWorth - minVal) / range) * chartHeight;
-    return { x, y, ...d };
+    return { x: isNaN(x) ? width / 2 : x, y: isNaN(y) ? height / 2 : y, ...d };
   });
 
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${height - paddingY} L ${points[0].x.toFixed(1)} ${height - paddingY} Z`;
+  const linePath =
+    data.length === 1
+      ? `M ${paddingX} ${points[0].y.toFixed(1)} L ${width - paddingX} ${points[0].y.toFixed(1)}`
+      : points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+  const areaPath =
+    data.length === 1
+      ? `M ${paddingX} ${points[0].y.toFixed(1)} L ${width - paddingX} ${points[0].y.toFixed(1)} L ${width - paddingX} ${height - paddingY} L ${paddingX} ${height - paddingY} Z`
+      : `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${height - paddingY} L ${points[0].x.toFixed(1)} ${height - paddingY} Z`;
 
   const activePoint = hoveredIndex !== null ? points[hoveredIndex] : points[points.length - 1];
 
