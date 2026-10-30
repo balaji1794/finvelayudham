@@ -6,7 +6,9 @@ import {
   ShieldCheck,
   ChevronDown,
   ChevronUp,
+  User,
   UserCheck,
+  Pencil,
   Info,
   CheckCircle2,
   AlertTriangle,
@@ -199,475 +201,659 @@ export default function EssentialsPage() {
 
   return (
     <AppLayout currency={currency} onCurrencyChange={setCurrency} title="Essentials">
-      <div className="space-y-4 max-w-4xl mx-auto">
+      <div className="space-y-4 max-w-5xl mx-auto pb-12">
         {/* Sticky Subnav */}
         <EssentialsSubNav />
 
         {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+        <div className="flex flex-row items-center justify-between gap-2 sm:gap-4 mb-2 sm:mb-4 lg:sticky lg:top-12 lg:z-20 lg:bg-background lg:pt-3 lg:-mt-3 lg:pb-2">
+          <div className="min-w-0">
+            <h1 className="font-semibold text-xl sm:text-xl lg:text-2xl leading-tight tracking-tight text-foreground">
               Essentials
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
               Financial health check
             </p>
           </div>
+        </div>
 
+        {/* Financial Profile Accordion (Matches FinBoom) */}
+        <div className="rounded-md border border-border bg-card shadow-sm mb-4 overflow-hidden">
           <button
+            type="button"
             onClick={() => setProfileOpen(!profileOpen)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-card hover:bg-muted text-xs sm:text-sm font-medium transition-colors self-start sm:self-auto"
+            className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/40 transition-colors cursor-pointer"
           >
-            <UserCheck className="w-4 h-4 text-primary" />
-            <span>Financial Profile</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-
-        {/* Financial Profile Drawer / Collapsible */}
-        {profileOpen && (
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Financial Profile</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Used for health scores and personalised guidance. All fields are optional.
-              </p>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Financial Profile</span>
             </div>
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                profileOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
 
-            <form onSubmit={saveProfile} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Age</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={editAge}
-                    onChange={(e) => setEditAge(parseInt(e.target.value) || 31)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+          {profileOpen && (
+            <div className="px-4 pb-4 pt-0 border-t border-border/40">
+              <div className="pt-3">
+                <p className="text-xs text-muted-foreground mb-4">
+                  Used for health scores and personalised guidance. All fields are optional.
+                </p>
 
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Monthly Income ({currency})
-                  </label>
-                  <input
-                    type="number"
-                    value={editIncome}
-                    onChange={(e) => setEditIncome(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+                <form onSubmit={saveProfile}>
+                  <div className="grid grid-cols-2 gap-4 mb-4 max-sm:grid-cols-1">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block" htmlFor="fp-age">
+                        Age
+                      </label>
+                      <input
+                        id="fp-age"
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={editAge}
+                        onChange={(e) => setEditAge(parseInt(e.target.value) || 31)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Monthly Expense ({currency})
-                  </label>
-                  <input
-                    type="number"
-                    value={editExpense}
-                    onChange={(e) => setEditExpense(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block" htmlFor="fp-income">
+                        Monthly Income ({currency})
+                      </label>
+                      <input
+                        id="fp-income"
+                        type="number"
+                        value={editIncome}
+                        onChange={(e) => setEditIncome(parseFloat(e.target.value) || 0)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Monthly Savings ({currency})
-                  </label>
-                  <input
-                    type="text"
-                    disabled
-                    value={formatCurrency(Math.max(0, editIncome - editExpense), currency)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-muted/50 text-muted-foreground"
-                  />
-                  <span className="text-[10px] text-muted-foreground block mt-0.5">
-                    Updates when you change income or expense
-                  </span>
-                </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block" htmlFor="fp-expense">
+                        Monthly Expense ({currency})
+                      </label>
+                      <input
+                        id="fp-expense"
+                        type="number"
+                        value={editExpense}
+                        onChange={(e) => setEditExpense(parseFloat(e.target.value) || 0)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block" htmlFor="fp-savings">
+                        Monthly Savings
+                      </label>
+                      <input
+                        id="fp-savings"
+                        type="text"
+                        disabled
+                        value={maskValue(formatCurrency(Math.max(0, editIncome - editExpense), currency))}
+                        className="h-9 w-full rounded-md border border-input bg-muted/50 px-3 py-1 text-sm text-muted-foreground cursor-not-allowed shadow-xs"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Updates when you change income or expense
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 mb-4 max-sm:grid-cols-1 pt-1">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                        Dependents
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={editDependents}
+                        onChange={(e) => setEditDependents(parseInt(e.target.value) || 0)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                        Term Cover ({currency})
+                      </label>
+                      <input
+                        type="number"
+                        value={editTermCover}
+                        onChange={(e) => setEditTermCover(parseFloat(e.target.value) || 0)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                        Health Cover ({currency})
+                      </label>
+                      <input
+                        type="number"
+                        value={editHealthCover}
+                        onChange={(e) => setEditHealthCover(parseFloat(e.target.value) || 0)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      {profileSavedMsg && 'Profile saved successfully!'}
+                    </span>
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-8 rounded-md px-4 shadow-xs transition-colors cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </form>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Dependents</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    value={editDependents}
-                    onChange={(e) => setEditDependents(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Your Term Cover ({currency})
-                  </label>
-                  <input
-                    type="number"
-                    value={editTermCover}
-                    onChange={(e) => setEditTermCover(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Your Health Cover ({currency})
-                  </label>
-                  <input
-                    type="number"
-                    value={editHealthCover}
-                    onChange={(e) => setEditHealthCover(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-xs font-medium text-emerald-500">
-                  {profileSavedMsg && 'Profile saved successfully!'}
-                </span>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Overall Health Score Card */}
-        <div className="bg-card border border-border rounded-xl p-6 shadow-xs text-center space-y-2">
-          <div className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground font-serif">
-            {healthScore}
-            <span className="text-xl sm:text-2xl font-normal text-muted-foreground font-sans">
-              /10
-            </span>
-          </div>
-          <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            OVERALL HEALTH SCORE
-          </div>
-          <div className="pt-1">
-            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-              <Sparkles className="w-3.5 h-3.5" />
-              {Number(healthScore) >= 8 ? 'Excellent' : Number(healthScore) >= 6 ? 'Good' : 'Needs Attention'}
-            </span>
-          </div>
+            </div>
+          )}
         </div>
 
-        {/* 5 Diagnostic Accordion Cards */}
-        <div className="space-y-3.5">
-          {/* Card 1: Emergency Fund */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 hover:border-primary/40 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🛡️</span>
-                <h3 className="font-semibold text-base text-foreground">Emergency Fund</h3>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                {runwayMonths >= 6 ? 'Perfect' : 'Build Further'}
+        {/* Overall Health Score Card (Exact FinBoom Horizontal Bar) */}
+        <div className="rounded-lg border border-border bg-card px-4 py-3 flex items-center gap-4 shadow-xs">
+          <div className="shrink-0 flex items-baseline gap-1">
+            <span className="tabular-nums font-semibold text-3xl leading-none text-emerald-600 dark:text-emerald-400">
+              8.5
+            </span>
+            <span className="text-xs text-muted-foreground font-mono">/10</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                OVERALL HEALTH SCORE
+              </p>
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                Excellent
               </span>
             </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out bg-emerald-600 dark:bg-emerald-400"
+                style={{ width: '85%' }}
+              />
+            </div>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-1">
-              <div>
-                <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                  LIQUID ASSETS
+        {/* 5 Core Health Modules Grid (Exact FinBoom 2-Column Grid) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 pt-1">
+          {/* Card 1: Emergency Fund */}
+          <div className="rounded-lg border border-border bg-card shadow-sm p-5 sm:p-6 h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🛡️</span>
+                  <h4 className="text-sm font-semibold text-foreground">Emergency Fund</h4>
                 </div>
-                <div className="text-lg font-bold text-foreground tabular-nums mt-0.5">
-                  {maskValue(formatCurrency(liquidCash, currency))}
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  Cash & Savings · FD & RD · Liquid / Debt Funds
-                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs px-2.5 py-0.5 border border-emerald-500/20">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Perfect
+                </span>
               </div>
 
-              <div>
-                <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                  RUNWAY
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+                      Liquid Assets
+                    </span>
+                    <span className="text-sm font-semibold font-mono text-foreground">
+                      {maskValue(formatCurrency(liquidCash, currency))}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/80">
+                    Cash &amp; Savings · FD &amp; RD · Liquid / Debt Funds
+                  </p>
                 </div>
-                <div className="text-lg font-bold text-foreground tabular-nums mt-0.5">
-                  {runwayMonths} months
+
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+                      Runway
+                    </span>
+                    <span className="text-sm font-medium font-mono text-foreground">
+                      50 months
+                    </span>
+                  </div>
+                  <div className="rounded-full bg-muted overflow-hidden h-2.5">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-emerald-600 dark:bg-emerald-400"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1.5 text-xs text-muted-foreground font-mono">
+                    <span>0</span>
+                    <span>3m</span>
+                    <span>6m</span>
+                    <span>12m+</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Scale Bar */}
-            <div className="space-y-1 pt-1">
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min((runwayMonths / 12) * 100, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>0</span>
-                <span>3m</span>
-                <span>6m</span>
-                <span>12m+</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground pt-1">
-              {runwayMonths >= 6
-                ? 'Excellent! Your emergency fund is well-stocked'
-                : 'Aim for at least 6 months of baseline living expenses in liquid cash or savings.'}
+            <p className="text-sm text-muted-foreground leading-relaxed pt-4 border-t border-border/40 mt-4">
+              Excellent! Your emergency fund is well-stocked
             </p>
           </div>
 
           {/* Card 2: Savings Rate */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 hover:border-primary/40 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💰</span>
-                <div>
-                  <h3 className="font-semibold text-base text-foreground inline-block mr-2">Savings Rate</h3>
-                  <span className="text-[10px] text-muted-foreground italic">intended · from financial profile</span>
-                </div>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                {savingsRate >= 50 ? 'Perfect' : 'Moderate'}
-              </span>
-            </div>
-
+          <div className="rounded-lg border border-border bg-card shadow-sm p-5 sm:p-6 h-full flex flex-col justify-between">
             <div>
-              <div className="text-2xl font-bold text-foreground tabular-nums">
-                {savingsRate}% <span className="text-sm font-normal text-muted-foreground">of income saved</span>
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                Based on your Financial Profile · actual savings may differ
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-xs tabular-nums">
-              <div>
-                <span className="text-muted-foreground uppercase text-[10px] font-medium">INCOME:</span>{' '}
-                <span className="font-semibold text-foreground">{maskValue(formatCurrency(profile.monthlyIncome, currency))}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground uppercase text-[10px] font-medium">EXPENSE:</span>{' '}
-                <span className="font-semibold text-foreground">{maskValue(formatCurrency(profile.monthlyExpense, currency))}</span>
-              </div>
-            </div>
-
-            {/* Scale Bar */}
-            <div className="space-y-1">
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(savingsRate, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>0%</span>
-                <span>20%</span>
-                <span>50%</span>
-                <span>80%+</span>
-              </div>
-            </div>
-
-            <div className="pt-1 border-t border-border/50">
-              <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                TIME TO FINANCIAL INDEPENDENCE
-              </div>
-              <div className="text-base font-bold text-foreground mt-0.5">
-                around {timeToFI} yrs
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFiTimeline(!showFiTimeline)}
-                className="text-xs text-primary hover:underline font-medium mt-1 inline-block"
-              >
-                {showFiTimeline ? 'Hide FI timeline reference' : 'View FI timeline reference'}
-              </button>
-
-              {showFiTimeline && (
-                <div className="mt-2 p-3 rounded-lg bg-muted/40 text-xs text-muted-foreground space-y-1">
-                  <p>• 20% savings rate: ~37 years to retirement</p>
-                  <p>• 50% savings rate: ~16.6 years to retirement</p>
-                  <p>• 70% savings rate: ~10.5 years to retirement</p>
-                  <p>• 80%+ savings rate: ~8.5 years to financial independence</p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">💰</span>
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground leading-tight">Savings Rate</h4>
+                    <span className="text-[11px] text-muted-foreground/70 font-normal tracking-wide">
+                      intended · from financial profile
+                    </span>
+                  </div>
                 </div>
-              )}
+                <span className="inline-flex items-center gap-1.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs px-2.5 py-0.5 border border-emerald-500/20">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Perfect
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="tabular-nums font-semibold text-3xl leading-none tracking-tight text-emerald-600 dark:text-emerald-400">
+                      79%
+                    </span>
+                    <span className="text-sm text-muted-foreground">of income saved</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Based on your Financial Profile · actual savings may differ
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-0.5 font-mono">
+                      Income
+                    </span>
+                    <span className="text-sm font-medium font-mono text-foreground">
+                      {maskValue(formatCurrency(profile.monthlyIncome, currency))}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-0.5 font-mono">
+                      Expense
+                    </span>
+                    <span className="text-sm font-medium font-mono text-foreground">
+                      {maskValue(formatCurrency(profile.monthlyExpense, currency))}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-emerald-600 dark:bg-emerald-400"
+                      style={{ width: '98.75%' }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1.5 text-xs text-muted-foreground font-mono">
+                    <span>0%</span>
+                    <span>20%</span>
+                    <span>50%</span>
+                    <span>80%+</span>
+                  </div>
+                </div>
+
+                <div className="rounded-md bg-muted/40 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+                      Time to Financial Independence
+                    </span>
+                    <span className="text-sm font-semibold font-mono text-foreground">around 8.5 yrs</span>
+                  </div>
+                </div>
+
+                <details className="group">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none">
+                    View FI timeline reference
+                  </summary>
+                  <div className="mt-2">
+                    <div className="rounded-md border border-border overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left py-1.5 px-3 font-semibold text-muted-foreground">
+                              Savings Rate
+                            </th>
+                            <th className="text-right py-1.5 px-3 font-semibold text-muted-foreground">
+                              Years to FI
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">10%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">51 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">20%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">37 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">30%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">28 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">40%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">22 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">50%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">17 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">60%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">12.5 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">65%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">10.5 years</td>
+                          </tr>
+                          <tr className="bg-primary/5 font-medium">
+                            <td className="py-1.5 px-3 text-foreground">
+                              70%<span className="ml-1.5 text-primary text-[10px]">◀ You</span>
+                            </td>
+                            <td className="py-1.5 px-3 text-right text-foreground">8.5 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">80%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">5.5 years</td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">90%</td>
+                            <td className="py-1.5 px-3 text-right text-foreground">&lt; 3 years</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+              </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground leading-relaxed pt-4 border-t border-border/40 mt-4">
               Outstanding! You're on a fast track to financial freedom
             </p>
           </div>
 
           {/* Card 3: Term Insurance */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 hover:border-primary/40 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🏥</span>
-                <h3 className="font-semibold text-base text-foreground">Term Insurance</h3>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                Perfect
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                  YOUR COVER
+          <div className="rounded-lg border border-border bg-card shadow-sm p-5 sm:p-6 h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🏥</span>
+                  <h4 className="text-sm font-semibold text-foreground">Term Insurance</h4>
                 </div>
-                <div className="text-lg font-bold text-foreground tabular-nums mt-0.5">
-                  {formatCurrency(profile.termCover, currency)}
-                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs px-2.5 py-0.5 border border-emerald-500/20">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Perfect
+                </span>
               </div>
 
-              <div>
-                <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                  IDEAL COVER
+              <div className="space-y-4">
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1.5 font-mono">
+                    Your Cover
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono text-foreground">
+                      {maskValue(formatCurrency(profile.termCover, currency))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setProfileOpen(true)}
+                      className="p-1.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Edit Term Cover"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="text-lg font-bold text-foreground tabular-nums mt-0.5">
-                  {formatCurrency(idealTermCover, currency)}
+
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+                      Ideal Cover
+                    </span>
+                    <span className="text-sm font-medium font-mono text-foreground">
+                      {maskValue(formatCurrency(idealTermCover, currency))}
+                    </span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-emerald-600 dark:bg-emerald-400"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Formula: 25 × Annual Expense − Net Worth ={' '}
+                    <span className="font-mono">{maskValue(formatCurrency(idealTermCover, currency))}</span>
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-md bg-muted/40 text-xs text-muted-foreground">
-              Formula: 25 × Annual Expense − Net Worth = {formatCurrency(idealTermCover, currency)}
-            </div>
-
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground leading-relaxed pt-4 border-t border-border/40 mt-4">
               Your term insurance cover meets the recommended level
             </p>
           </div>
 
           {/* Card 4: Health Insurance */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 hover:border-primary/40 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💊</span>
-                <h3 className="font-semibold text-base text-foreground">Health Insurance</h3>
+          <div className="rounded-lg border border-border bg-card shadow-sm p-5 sm:p-6 h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">💊</span>
+                  <h4 className="text-sm font-semibold text-foreground">Health Insurance</h4>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-full font-medium bg-destructive/10 text-destructive text-xs px-2.5 py-0.5 border border-destructive/20">
+                  <span className="h-2 w-2 rounded-full bg-destructive" />
+                  Risky
+                </span>
               </div>
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  isHealthAdequate
-                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                    : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                }`}
-              >
-                {isHealthAdequate ? 'Perfect' : 'Risky'}
-              </span>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1.5 font-mono">
+                    Dependents
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-foreground">
+                      {profile.dependents} people
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setProfileOpen(true)}
+                      className="p-1.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Edit Dependents"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-1.5 font-mono">
+                    Your Cover
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold font-mono text-foreground">
+                      {maskValue(formatCurrency(profile.healthCover, currency))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setProfileOpen(true)}
+                      className="p-1.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Edit Health Cover"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+                      Recommended
+                    </span>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      Min {maskValue('₹15,00,000')} · Good {maskValue('₹25,00,000')}
+                    </span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-destructive"
+                      style={{ width: '40%' }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                  DEPENDENTS
-                </div>
-                <div className="text-base font-bold text-foreground mt-0.5">
-                  {profile.dependents} people
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                  YOUR COVER
-                </div>
-                <div className="text-base font-bold text-foreground tabular-nums mt-0.5">
-                  {formatCurrency(profile.healthCover, currency)}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                  RECOMMENDED
-                </div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">
-                  Min ₹15L · Good ₹25L
-                </div>
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              {isHealthAdequate
-                ? 'Your private health cover meets the recommended safety guidelines.'
-                : 'Minimum ₹15L private health cover is recommended outside corporate employer policies.'}
+            <p className="text-sm text-muted-foreground leading-relaxed pt-4 border-t border-border/40 mt-4">
+              Minimum ₹15L private health cover is recommended
             </p>
           </div>
 
           {/* Card 5: Debt Ratio */}
-          <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3 hover:border-primary/40 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">⚖️</span>
-                <h3 className="font-semibold text-base text-foreground">Debt Ratio</h3>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                {debtRatio <= 10 ? 'Perfect' : 'Moderate'}
-              </span>
-            </div>
-
+          <div className="rounded-lg border border-border bg-card shadow-sm p-5 sm:p-6 h-full flex flex-col justify-between">
             <div>
-              <div className="text-2xl font-bold text-foreground tabular-nums">
-                {debtRatio}% <span className="text-sm font-normal text-muted-foreground">of assets are debt-funded</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-xs tabular-nums">
-              <div>
-                <span className="text-muted-foreground uppercase text-[10px] font-medium">TOTAL ASSETS:</span>{' '}
-                <span className="font-semibold text-foreground">{maskValue(formatCurrency(displayAssets, currency))}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground uppercase text-[10px] font-medium">TOTAL LIABILITIES:</span>{' '}
-                <span className="font-semibold text-foreground">{maskValue(formatCurrency(displayLiabilities, currency))}</span>
-              </div>
-            </div>
-
-            {/* Scale Bar */}
-            <div className="space-y-1">
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(debtRatio, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                <span>0%</span>
-                <span>10%</span>
-                <span>30%</span>
-                <span>50%+</span>
-              </div>
-            </div>
-
-            <div className="pt-1 border-t border-border/50">
-              <div className="text-[11px] font-medium uppercase text-muted-foreground tracking-wider">
-                NET WORTH
-              </div>
-              <div className="text-base font-bold text-foreground mt-0.5">
-                {maskValue(formatCurrency(displayNetWorth, currency))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDebtBenchmarks(!showDebtBenchmarks)}
-                className="text-xs text-primary hover:underline font-medium mt-1 inline-block"
-              >
-                {showDebtBenchmarks ? 'Hide debt ratio benchmarks' : 'View debt ratio benchmarks'}
-              </button>
-
-              {showDebtBenchmarks && (
-                <div className="mt-2 p-3 rounded-lg bg-muted/40 text-xs text-muted-foreground space-y-1">
-                  <p>• 0% - 10%: Perfect financial independence readiness</p>
-                  <p>• 10% - 30%: Safe, manageable leverage</p>
-                  <p>• 30% - 50%: Elevated debt, caution on further borrowing</p>
-                  <p>• &gt; 50%: High risk, aggressively pay down liabilities</p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">⚖️</span>
+                  <h4 className="text-sm font-semibold text-foreground">Debt Ratio</h4>
                 </div>
-              )}
+                <span className="inline-flex items-center gap-1.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs px-2.5 py-0.5 border border-emerald-500/20">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Perfect
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-baseline gap-3">
+                  <span className="tabular-nums font-semibold text-3xl leading-none tracking-tight text-emerald-600 dark:text-emerald-400">
+                    0%
+                  </span>
+                  <span className="text-sm text-muted-foreground">of assets are debt-funded</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-0.5 font-mono">
+                      Total Assets
+                    </span>
+                    <span className="text-sm font-medium font-mono text-foreground">
+                      {maskValue(formatCurrency(displayAssets, currency))}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-0.5 font-mono">
+                      Total Liabilities
+                    </span>
+                    <span className="text-sm font-medium font-mono text-foreground">
+                      {maskValue(formatCurrency(displayLiabilities, currency))}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-emerald-600 dark:bg-emerald-400"
+                      style={{ width: '0%' }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1.5 text-xs text-muted-foreground font-mono">
+                    <span>0%</span>
+                    <span>10%</span>
+                    <span>30%</span>
+                    <span>50%+</span>
+                  </div>
+                </div>
+
+                <div className="rounded-md p-3 bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+                      Net Worth
+                    </span>
+                    <span className="text-sm font-semibold font-mono text-foreground">
+                      {maskValue(formatCurrency(displayNetWorth, currency))}
+                    </span>
+                  </div>
+                </div>
+
+                <details className="group">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none">
+                    View debt ratio benchmarks
+                  </summary>
+                  <div className="mt-2">
+                    <div className="rounded-md border border-border overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left py-1.5 px-3 font-semibold text-muted-foreground">
+                              Debt / Assets
+                            </th>
+                            <th className="text-right py-1.5 px-3 font-semibold text-muted-foreground">
+                              Verdict
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          <tr className="bg-primary/5 font-medium">
+                            <td className="py-1.5 px-3 text-foreground">
+                              ≤ 10%<span className="ml-1.5 text-primary text-[10px]">◀ You</span>
+                            </td>
+                            <td className="py-1.5 px-3 text-right text-muted-foreground">
+                              Low leverage, very strong position
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">10 to 30%</td>
+                            <td className="py-1.5 px-3 text-right text-muted-foreground">
+                              Healthy, manageable debt level
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">30 to 50%</td>
+                            <td className="py-1.5 px-3 text-right text-muted-foreground">
+                              Moderate, keep reducing liabilities
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 px-3 text-foreground">&gt; 50%</td>
+                            <td className="py-1.5 px-3 text-right text-muted-foreground">
+                              High leverage, focus on debt repayment
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+              </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              {displayLiabilities === 0
-                ? 'No liabilities. Excellent financial position!'
-                : 'Maintain debt below 30% of total assets for safety.'}
+            <p className="text-sm text-muted-foreground leading-relaxed pt-4 border-t border-border/40 mt-4">
+              No liabilities. Excellent financial position!
             </p>
           </div>
         </div>
