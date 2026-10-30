@@ -211,18 +211,20 @@ export async function POST(req: Request) {
         }
       }
 
+      const actuallyDeliveredToUser = delivered && deliveredTo === cleanEmail;
+
       console.log(`[FinVelayudham Auth] Verification Code for ${cleanEmail}: ${generatedCode} (${dispatchLog})`);
 
       const response = NextResponse.json({
         success: true,
-        delivered,
+        delivered: actuallyDeliveredToUser,
         deliveredTo,
         dispatchLog,
         token,
-        sandboxCode: generatedCode,
-        message: delivered
-          ? `Verification code dispatched to ${deliveredTo}`
-          : `Code generated: ${generatedCode} (Email service offline/restricted)`,
+        sandboxCode: actuallyDeliveredToUser ? undefined : generatedCode,
+        message: actuallyDeliveredToUser
+          ? `Verification code dispatched to ${cleanEmail}`
+          : `Email delivery to ${cleanEmail} was blocked by the email provider sandbox (Resend free tier only sends to balajibuddy1794@gmail.com). To receive emails at ${cleanEmail}, configure Gmail SMTP credentials in Vercel.`,
       });
 
       // Also set secure verification cookie

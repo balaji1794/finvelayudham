@@ -43,7 +43,9 @@ function LoginForm() {
   // 2FA verification code state
   const [verificationCode, setVerificationCode] = useState('');
   const [verifiedName, setVerifiedName] = useState('');
-  const [pendingSandboxCode, setPendingSandboxCode] = useState<string | null>(null);
+  const [emailDelivered, setEmailDelivered] = useState(true);
+  const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
+  const [fallbackCode, setFallbackCode] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [deviceLabel, setDeviceLabel] = useState('This Browser');
 
@@ -104,8 +106,13 @@ function LoginForm() {
         }
 
         setVerifiedName(name.trim());
-        if (codeRes.sandboxCode) {
-          setPendingSandboxCode(codeRes.sandboxCode);
+        setEmailDelivered(Boolean(codeRes.delivered));
+        if (!codeRes.delivered) {
+          setDeliveryNotice(codeRes.message || null);
+          setFallbackCode(codeRes.sandboxCode || null);
+        } else {
+          setDeliveryNotice(null);
+          setFallbackCode(null);
         }
         setResendCooldown(30);
         setStep('verify-code');
@@ -138,8 +145,13 @@ function LoginForm() {
 
       // 3. Untrusted device: dispatch email verification code
       const codeRes = await requestVerification(cleanEmail, memberName, 'login');
-      if (codeRes.sandboxCode) {
-        setPendingSandboxCode(codeRes.sandboxCode);
+      setEmailDelivered(Boolean(codeRes.delivered));
+      if (!codeRes.delivered) {
+        setDeliveryNotice(codeRes.message || null);
+        setFallbackCode(codeRes.sandboxCode || null);
+      } else {
+        setDeliveryNotice(null);
+        setFallbackCode(null);
       }
       setResendCooldown(30);
       setStep('verify-code');
@@ -208,8 +220,13 @@ function LoginForm() {
         mode === 'register' ? 'register' : 'login'
       );
 
-      if (codeRes.sandboxCode) {
-        setPendingSandboxCode(codeRes.sandboxCode);
+      setEmailDelivered(Boolean(codeRes.delivered));
+      if (!codeRes.delivered) {
+        setDeliveryNotice(codeRes.message || null);
+        setFallbackCode(codeRes.sandboxCode || null);
+      } else {
+        setDeliveryNotice(null);
+        setFallbackCode(null);
       }
       setResendCooldown(30);
     } catch {
@@ -295,27 +312,30 @@ function LoginForm() {
               </p>
             </div>
 
-            {/* Sandbox / Testing Helper Pill & Spam notification */}
-            <div className="space-y-2">
-              {pendingSandboxCode && (
-                <div
-                  onClick={() => setVerificationCode(pendingSandboxCode)}
-                  className="cursor-pointer bg-primary/10 hover:bg-primary/15 border border-primary/30 rounded-lg p-2.5 text-center transition-all group"
-                  title="Click to auto-fill code"
-                >
-                  <div className="text-[11px] font-medium text-primary flex items-center justify-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Instant Code: <span className="font-mono font-bold tracking-wider">{pendingSandboxCode}</span>
-                    <span className="text-[10px] text-muted-foreground group-hover:text-primary transition-colors">
-                      (Click to paste)
-                    </span>
-                  </div>
+            {/* Notice if external email delivery was blocked by Resend Sandbox */}
+            {!emailDelivered && deliveryNotice && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-left space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  Email Sandbox Notice
                 </div>
-              )}
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Resend testing mode only sends emails to <code className="text-foreground">balajibuddy1794@gmail.com</code>. To deliver to other inboxes, configure Gmail SMTP in Vercel.
+                </p>
+                {fallbackCode && (
+                  <div className="p-2 bg-background border border-amber-500/20 rounded text-center">
+                    <span className="text-[10px] text-muted-foreground block mb-0.5">Temporary Backup Code:</span>
+                    <span className="font-mono font-bold text-sm text-foreground tracking-widest">{fallbackCode}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {emailDelivered && (
               <p className="text-[11px] text-muted-foreground text-center">
                 📬 Don&apos;t see the email? Please check your <strong>Spam / Junk</strong> or <strong>Promotions</strong> folder.
               </p>
-            </div>
+            )}
 
             {/* OTP Form */}
             <form onSubmit={handleVerifyCodeSubmit} className="space-y-4">
