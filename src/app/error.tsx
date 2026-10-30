@@ -18,14 +18,22 @@ export default function ErrorBoundary({
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem('finvelayudham_chunk_reload');
+        sessionStorage.removeItem('finvelayudham_chunk_reload_count');
+        sessionStorage.removeItem('fv_chunk_reload');
         if ('caches' in window) {
           caches.keys().then((names) => {
             names.forEach((name) => caches.delete(name));
           });
         }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const registration of registrations) {
+              registration.unregister();
+            }
+          });
+        }
       } catch {}
-      const cleanUrl = window.location.origin + window.location.pathname;
-      window.location.replace(`${cleanUrl}?_ts=${Date.now()}`);
+      window.location.href = window.location.origin + window.location.pathname + '?_fresh=' + Date.now();
     }
   };
 
@@ -40,23 +48,29 @@ export default function ErrorBoundary({
 
     if (isChunkError && typeof window !== 'undefined') {
       try {
-        const reloadKey = 'finvelayudham_chunk_reload';
-        const lastReload = sessionStorage.getItem(reloadKey);
+        const reloadCountKey = 'finvelayudham_chunk_reload_count';
+        const count = Number(sessionStorage.getItem(reloadCountKey) || '0');
         const now = Date.now();
-        // Prevent reload loops (max once every 12 seconds)
-        if (!lastReload || now - Number(lastReload) > 12000) {
-          sessionStorage.setItem(reloadKey, String(now));
+        // Automatically hard refresh up to 2 times to fetch fresh chunks from new deployment
+        if (count < 2) {
+          sessionStorage.setItem(reloadCountKey, String(count + 1));
           if ('caches' in window) {
             caches.keys().then((names) => {
               names.forEach((name) => caches.delete(name));
             });
           }
-          const cleanUrl = window.location.origin + window.location.pathname;
-          window.location.replace(`${cleanUrl}?_ts=${now}`);
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+              for (const registration of registrations) {
+                registration.unregister();
+              }
+            });
+          }
+          window.location.href = window.location.origin + window.location.pathname + '?_fresh=' + now;
+          return;
         }
       } catch {
-        // Fallback for Brave Shields / private mode where sessionStorage is restricted
-        window.location.replace(window.location.pathname + '?_ts=' + Date.now());
+        window.location.reload();
       }
     }
   }, [error]);

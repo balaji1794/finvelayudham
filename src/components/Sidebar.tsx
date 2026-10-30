@@ -22,6 +22,7 @@ import {
   CreditCard,
   Camera,
   Check,
+  Landmark,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -73,11 +74,11 @@ export default function Sidebar({
         pathname === '/snapshots'
       );
     }
+    if (path === '/accounts') return pathname === '/accounts';
     if (path === '/transactions') {
       return (
         pathname === '/transactions' ||
         pathname === '/money' ||
-        pathname === '/accounts' ||
         pathname === '/budget' ||
         pathname.startsWith('/money/')
       );
@@ -256,6 +257,11 @@ export default function Sidebar({
             <Link href="/assets" className={navClasses('/assets')}>
               <TrendingUp className="w-4 h-4" />
               <span>Wealth</span>
+            </Link>
+
+            <Link href="/accounts" className={navClasses('/accounts')}>
+              <Landmark className="w-4 h-4" />
+              <span>Accounts</span>
             </Link>
 
             <Link href="/transactions" className={navClasses('/transactions')}>

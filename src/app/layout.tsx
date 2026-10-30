@@ -56,20 +56,27 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
+                try {
+                  sessionStorage.removeItem('finvelayudham_chunk_reload_count');
+                } catch(e) {}
                 function tryReload() {
                   try {
-                    var k = 'fv_chunk_reload';
-                    var last = sessionStorage.getItem(k);
+                    var k = 'finvelayudham_chunk_reload_count';
+                    var count = Number(sessionStorage.getItem(k) || '0');
                     var now = Date.now();
-                    if (!last || (now - Number(last)) > 10000) {
-                      sessionStorage.setItem(k, String(now));
+                    if (count < 2) {
+                      sessionStorage.setItem(k, String(count + 1));
                       if ('caches' in window) {
                         caches.keys().then(function(names) {
                           names.forEach(function(n) { caches.delete(n); });
                         });
                       }
-                      var cleanUrl = window.location.origin + window.location.pathname;
-                      window.location.replace(cleanUrl + '?_v=' + now);
+                      if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.getRegistrations().then(function(regs) {
+                          regs.forEach(function(r) { r.unregister(); });
+                        });
+                      }
+                      window.location.href = window.location.origin + window.location.pathname + '?_fresh=' + now;
                     }
                   } catch(e) {
                     window.location.reload();
