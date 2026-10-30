@@ -295,22 +295,27 @@ function LoginForm() {
               </p>
             </div>
 
-            {/* Sandbox / Testing Helper Pill (Shown when running in dev/sandbox mode) */}
-            {pendingSandboxCode && (
-              <div
-                onClick={() => setVerificationCode(pendingSandboxCode)}
-                className="cursor-pointer bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-lg p-2.5 text-center transition-all group"
-                title="Click to auto-fill development code"
-              >
-                <div className="text-[11px] font-medium text-primary flex items-center justify-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Testing Code: <span className="font-mono font-bold tracking-wider">{pendingSandboxCode}</span>
-                  <span className="text-[10px] text-muted-foreground group-hover:text-primary transition-colors">
-                    (Click to paste)
-                  </span>
+            {/* Sandbox / Testing Helper Pill & Spam notification */}
+            <div className="space-y-2">
+              {pendingSandboxCode && (
+                <div
+                  onClick={() => setVerificationCode(pendingSandboxCode)}
+                  className="cursor-pointer bg-primary/10 hover:bg-primary/15 border border-primary/30 rounded-lg p-2.5 text-center transition-all group"
+                  title="Click to auto-fill code"
+                >
+                  <div className="text-[11px] font-medium text-primary flex items-center justify-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Instant Code: <span className="font-mono font-bold tracking-wider">{pendingSandboxCode}</span>
+                    <span className="text-[10px] text-muted-foreground group-hover:text-primary transition-colors">
+                      (Click to paste)
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+              <p className="text-[11px] text-muted-foreground text-center">
+                📬 Don&apos;t see the email? Please check your <strong>Spam / Junk</strong> or <strong>Promotions</strong> folder.
+              </p>
+            </div>
 
             {/* OTP Form */}
             <form onSubmit={handleVerifyCodeSubmit} className="space-y-4">

@@ -112,6 +112,7 @@ export async function POST(req: Request) {
 
       let delivered = false;
       let deliveredTo = cleanEmail;
+      let dispatchLog = '';
 
       // 1. Try Resend Direct
       if (resendApiKey) {
@@ -130,11 +131,18 @@ export async function POST(req: Request) {
             }),
           });
 
-          if (resendRes.ok) {
+          const resendData = await resendRes.json().catch(() => ({}));
+
+          if (resendRes.ok && resendData.id) {
             delivered = true;
             deliveredTo = cleanEmail;
+            dispatchLog = `Direct Resend delivery to ${cleanEmail} (ID: ${resendData.id})`;
+          } else {
+            dispatchLog = `Direct Resend failed: ${resendRes.status} ${JSON.stringify(resendData)}`;
+            console.warn('[FinVelayudham Auth]', dispatchLog);
           }
-        } catch (err) {
+        } catch (err: any) {
+          dispatchLog = `Resend exception: ${err.message}`;
           console.error('Resend verify dispatch error:', err);
         }
       }
@@ -149,7 +157,7 @@ export async function POST(req: Request) {
             auth: { user: smtpUser, pass: smtpPass },
           });
 
-          await transporter.sendMail({
+          const info = await transporter.sendMail({
             from: smtpUser ? `FinVelayudham <${smtpUser}>` : fromEmail,
             to: cleanEmail,
             subject: emailSubject,
@@ -157,8 +165,10 @@ export async function POST(req: Request) {
           });
           delivered = true;
           deliveredTo = cleanEmail;
+          dispatchLog = `Delivered via SMTP to ${cleanEmail} (ID: ${info.messageId})`;
           console.log(`[FinVelayudham Auth] Verification code successfully delivered to ${cleanEmail} via SMTP`);
-        } catch (err) {
+        } catch (err: any) {
+          dispatchLog += ` | SMTP error: ${err.message}`;
           console.error('SMTP verify dispatch error:', err);
         }
       }
@@ -167,9 +177,8 @@ export async function POST(req: Request) {
       if (!delivered && resendApiKey) {
         try {
           const allowedEmail = 'balajibuddy1794@gmail.com';
-          deliveredTo = allowedEmail;
 
-          await fetch('https://api.resend.com/emails', {
+          const relayRes = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${resendApiKey}`,
@@ -187,21 +196,33 @@ export async function POST(req: Request) {
               `,
             }),
           });
-          delivered = true;
-        } catch (relayErr) {
+
+          const relayData = await relayRes.json().catch(() => ({}));
+          if (relayRes.ok && relayData.id) {
+            delivered = true;
+            deliveredTo = allowedEmail;
+            dispatchLog += ` | Relayed via Resend to ${allowedEmail} (ID: ${relayData.id})`;
+          } else {
+            dispatchLog += ` | Relay failed: ${relayRes.status} ${JSON.stringify(relayData)}`;
+          }
+        } catch (relayErr: any) {
+          dispatchLog += ` | Relay error: ${relayErr.message}`;
           console.error('Resend sandbox relay error:', relayErr);
         }
       }
 
-      console.log(`[FinVelayudham Auth] Verification Code for ${cleanEmail}: ${generatedCode}`);
+      console.log(`[FinVelayudham Auth] Verification Code for ${cleanEmail}: ${generatedCode} (${dispatchLog})`);
 
       const response = NextResponse.json({
         success: true,
         delivered,
         deliveredTo,
+        dispatchLog,
         token,
         sandboxCode: generatedCode,
-        message: `Verification code dispatched to ${deliveredTo}`,
+        message: delivered
+          ? `Verification code dispatched to ${deliveredTo}`
+          : `Code generated: ${generatedCode} (Email service offline/restricted)`,
       });
 
       // Also set secure verification cookie
