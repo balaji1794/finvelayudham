@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   TrendingUp,
+  TrendingDown,
   ArrowUpRight,
   ArrowDownLeft,
   Camera,
@@ -15,9 +16,12 @@ import {
   Sparkles,
   ShieldCheck,
   ChevronRight,
+  ChevronDown,
   Trash2,
   Lock,
   Plus,
+  Scale,
+  Target,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import InteractiveAreaChart from '@/components/InteractiveAreaChart';
@@ -25,7 +29,7 @@ import AssetBreakdownDonut from '@/components/AssetBreakdownDonut';
 import AddAssetModal from '@/components/AddAssetModal';
 import AddLiabilityModal from '@/components/AddLiabilityModal';
 import AddExpenseModal from '@/components/AddExpenseModal';
-import { Asset, Liability, Snapshot, Transaction } from '@/lib/types';
+import { Asset, Liability, Snapshot, Transaction, Goal } from '@/lib/types';
 import { formatCurrency, convertAmount } from '@/lib/currencies';
 import { useAuth } from '@/context/AuthContext';
 import { usePrivacy } from '@/context/PrivacyContext';
@@ -34,6 +38,7 @@ import {
   loadUserPortfolio,
   saveUserPortfolio,
   loadStarterTemplate,
+  STARTER_GOALS,
 } from '@/lib/portfolio-vault';
 
 export default function DashboardPage() {
@@ -49,8 +54,15 @@ export default function DashboardPage() {
   const [liabilities, setLiabilities] = useState<Liability[]>([]);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [lastSaved, setLastSaved] = useState<string>('');
   const [saveBanner, setSaveBanner] = useState<string>('');
+
+  // Accordion Expand/Collapse States (matches FinBoom overview)
+  const [wealthOpen, setWealthOpen] = useState(false);
+  const [investmentsOpen, setInvestmentsOpen] = useState(false);
+  const [goalsOpen, setGoalsOpen] = useState(true);
+  const [holdingsFilter, setHoldingsFilter] = useState<'ALL' | 'EQUITY' | 'CASH' | 'COMMODITIES'>('ALL');
 
   // Modals
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
@@ -76,6 +88,7 @@ export default function DashboardPage() {
         setLiabilities(portfolio.liabilities || []);
         setSnapshots(portfolio.snapshots || []);
         setTransactions(portfolio.transactions || []);
+        setGoals(portfolio.goals && portfolio.goals.length > 0 ? portfolio.goals : STARTER_GOALS);
         setLastSaved(portfolio.updatedAt || new Date().toISOString());
       } catch (err) {
         console.error('Failed to load user vault:', err);
@@ -230,6 +243,106 @@ export default function DashboardPage() {
     month: 'short',
     year: 'numeric',
   }).toUpperCase();
+
+  // Assets categorized for Wealth Accordion
+  const assetsByCategory = useMemo(() => {
+    const equityTotal = assets
+      .filter((a) => (a.category || '').toUpperCase() === 'EQUITY')
+      .reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
+    const cashTotal = assets
+      .filter((a) => (a.category || '').toUpperCase() === 'CASH')
+      .reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
+    const commoditiesTotal = assets
+      .filter((a) => (a.category || '').toUpperCase() === 'COMMODITY' || (a.category || '').toUpperCase() === 'COMMODITIES')
+      .reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
+    const debtTotal = assets
+      .filter((a) => (a.category || '').toUpperCase() === 'DEBT')
+      .reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
+    const realEstateTotal = assets
+      .filter((a) => (a.category || '').toUpperCase() === 'REAL_ESTATE')
+      .reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
+
+    const list = [
+      {
+        label: 'Equity',
+        amount: equityTotal,
+        color: '#2563eb', // Blue
+        href: '/assets?class=EQUITY',
+        pct: totalAssets > 0 ? (equityTotal / totalAssets) * 100 : 0,
+      },
+      {
+        label: 'Cash & Savings',
+        amount: cashTotal,
+        color: '#059669', // Green
+        href: '/accounts',
+        pct: totalAssets > 0 ? (cashTotal / totalAssets) * 100 : 0,
+      },
+      {
+        label: 'Commodities',
+        amount: commoditiesTotal,
+        color: '#d97706', // Amber
+        href: '/assets?class=COMMODITIES',
+        pct: totalAssets > 0 ? (commoditiesTotal / totalAssets) * 100 : 0,
+      },
+    ];
+
+    if (debtTotal > 0) {
+      list.push({
+        label: 'Fixed Income & Debt',
+        amount: debtTotal,
+        color: '#7c3aed',
+        href: '/assets?class=DEBT',
+        pct: totalAssets > 0 ? (debtTotal / totalAssets) * 100 : 0,
+      });
+    }
+    if (realEstateTotal > 0) {
+      list.push({
+        label: 'Real Estate',
+        amount: realEstateTotal,
+        color: '#ea580c',
+        href: '/assets?class=REAL_ESTATE',
+        pct: totalAssets > 0 ? (realEstateTotal / totalAssets) * 100 : 0,
+      });
+    }
+    return list;
+  }, [assets, currency, totalAssets]);
+
+  // Filtered Holdings for Investments Accordion
+  const filteredHoldings = useMemo(() => {
+    let list = assets;
+    if (holdingsFilter !== 'ALL') {
+      if (holdingsFilter === 'COMMODITIES') {
+        list = assets.filter((a) => (a.category || '').toUpperCase() === 'COMMODITIES' || (a.category || '').toUpperCase() === 'COMMODITY');
+      } else {
+        list = assets.filter((a) => (a.category || '').toUpperCase() === holdingsFilter);
+      }
+    }
+    return list.slice(0, 6);
+  }, [assets, holdingsFilter]);
+
+  // Goals calculations for Goals Accordion
+  const activeGoalList = useMemo(() => {
+    if (goals.length > 0) return goals;
+    return [
+      {
+        id: 'retirement-default',
+        name: 'Retirement Corpus',
+        category: 'RETIREMENT' as const,
+        targetAmount: 100000000,
+        currentAmount: totalAssets > 0 ? totalAssets : 9125000,
+        targetDate: '2050-12-31',
+        monthlyContribution: 50000,
+        currency: 'INR',
+      },
+    ];
+  }, [goals, totalAssets]);
+
+  const primaryGoal = activeGoalList[0];
+  const primaryGoalYear = (primaryGoal.targetDate || '2050').slice(0, 4);
+  const primaryGoalPct = Math.min(
+    Math.round(((primaryGoal.currentAmount || totalAssets || 9125000) / (primaryGoal.targetAmount || 100000000)) * 100),
+    100
+  );
 
   return (
     <AppLayout
@@ -507,161 +620,402 @@ export default function DashboardPage() {
         </div>
 
         {/* =========================================================================
-            ROW 3: WEALTH SNAPSHOT (TOTAL ASSETS & TOTAL LIABILITIES)
-            Matches FinBoom's Wealth Split Section (Image 1)
+            COLLAPSIBLE ACCORDION 1: WEALTH
+            Matches FinBoom's Wealth Accordion Section
            ========================================================================= */}
-        <div className="pt-2 space-y-4">
-          <div className="flex items-center gap-2 pb-1 border-b-2 border-emerald-700/60">
-            <span className="p-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="w-4 h-4" />
+        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+          <button
+            type="button"
+            onClick={() => setWealthOpen(!wealthOpen)}
+            className="w-full flex items-center gap-3 px-4 py-3 sm:py-3.5 text-left min-h-[52px] hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+          >
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                wealthOpen ? 'rotate-180' : ''
+              }`}
+            />
+            <span className="shrink-0">
+              <Scale className="h-4 w-4 text-primary" />
             </span>
-            <h2 className="font-serif text-lg font-bold text-foreground">Wealth</h2>
-          </div>
+            <div className="min-w-0 flex-1 flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground truncate">Wealth</span>
+            </div>
+          </button>
 
-          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
-              {/* Left: TOTAL ASSETS */}
-              <div className="p-5 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-                    Total Assets ({assets.length})
+          {wealthOpen && (
+            <div className="border-t border-border bg-background p-4 sm:p-5">
+              {/* Assets vs Liabilities Split */}
+              <div className="mb-5">
+                <div
+                  className="flex h-2 w-full overflow-hidden rounded-full bg-muted"
+                  role="img"
+                  aria-label="Assets versus liabilities split"
+                >
+                  <div
+                    className="h-full bg-emerald-600 transition-all duration-500"
+                    style={{
+                      width: `${
+                        totalAssets + totalLiabilities > 0
+                          ? ((totalAssets / (totalAssets + totalLiabilities)) * 100).toFixed(1)
+                          : 100
+                      }%`,
+                    }}
+                  />
+                  <div
+                    className="h-full bg-destructive transition-all duration-500"
+                    style={{
+                      width: `${
+                        totalAssets + totalLiabilities > 0
+                          ? ((totalLiabilities / (totalAssets + totalLiabilities)) * 100).toFixed(1)
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs font-mono font-bold">
+                  <span className="tabular-nums text-emerald-600 uppercase tracking-wide">
+                    {totalAssets + totalLiabilities > 0
+                      ? Math.round((totalAssets / (totalAssets + totalLiabilities)) * 100)
+                      : 100}
+                    % assets
                   </span>
-                  <span className="text-sm font-bold font-mono text-foreground">
-                    {maskValue(formatCurrency(totalAssets, currency))}
+                  <span className="tabular-nums text-destructive uppercase tracking-wide">
+                    {totalAssets + totalLiabilities > 0
+                      ? Math.round((totalLiabilities / (totalAssets + totalLiabilities)) * 100)
+                      : 0}
+                    % liabilities
                   </span>
                 </div>
-
-                {assets.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-4">
-                    No assets recorded yet. Use the Quick Add or Import tool.
-                  </p>
-                ) : (
-                  <div className="space-y-3 pt-1">
-                    {(() => {
-                      const categories = ['EQUITY', 'COMMODITIES', 'CASH', 'DEBT', 'REAL_ESTATE'];
-                      return categories
-                        .map((cat) => {
-                          const catTotal = assets
-                            .filter((a) => (a.category || '').toUpperCase() === cat)
-                            .reduce((sum, a) => sum + convertAmount(a.currentValue, a.currentCurrency, currency), 0);
-                          const pct = totalAssets > 0 ? (catTotal / totalAssets) * 100 : 0;
-                          if (catTotal === 0) return null;
-                          return (
-                            <div key={cat} className="space-y-1">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="flex items-center gap-1.5 font-medium text-foreground capitalize">
-                                  <span className="w-2 h-2 rounded-full bg-primary" />
-                                  {cat.toLowerCase().replace(/_/g, ' ')}
-                                </span>
-                                <span className="font-mono text-muted-foreground">
-                                  {maskValue(formatCurrency(catTotal, currency))} ({pct.toFixed(1)}%)
-                                </span>
-                              </div>
-                              <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-primary h-full rounded-full" style={{ width: `${pct}%` }} />
-                              </div>
-                            </div>
-                          );
-                        })
-                        .filter(Boolean);
-                    })()}
-                  </div>
-                )}
               </div>
 
-              {/* Right: TOTAL LIABILITIES */}
-              <div className="p-5 sm:p-6 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-                      Total Liabilities
-                    </span>
-                    <span className="text-sm font-bold font-mono text-destructive">
-                      {maskValue(formatCurrency(totalLiabilities, currency))}
-                    </span>
-                  </div>
-
-                  {liabilities.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-muted-foreground">
-                      <p>No liabilities recorded.</p>
-                      <button
-                        onClick={() => setIsAddLiabilityOpen(true)}
-                        className="mt-2 text-primary hover:underline font-semibold cursor-pointer"
-                      >
-                        Add liability →
-                      </button>
+              {/* 2-Column Split */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Column: Assets */}
+                <div className="relative overflow-hidden border rounded-xl bg-emerald-500/5 border-emerald-500/20">
+                  <span className="absolute inset-y-0 left-0 w-[3px] bg-emerald-600" aria-hidden="true" />
+                  <div className="pl-4 pr-3 pt-3 pb-3">
+                    <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                      <Link href="/assets" className="group flex items-center gap-1.5 min-w-0">
+                        <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                        <span className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
+                          Assets
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground bg-background/60 px-1 rounded">
+                          {assets.length}
+                        </span>
+                      </Link>
+                      <span className="font-mono font-bold text-xl text-emerald-600">
+                        {maskValue(formatCurrency(totalAssets, currency))}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {liabilities.map((l) => (
-                        <div key={l.id} className="flex justify-between items-center text-xs py-1">
-                          <span className="font-medium text-foreground">{l.name}</span>
-                          <span className="font-mono text-destructive">
-                            {maskValue(formatCurrency(convertAmount(l.outstandingAmount, l.currency, currency), currency))}
-                          </span>
-                        </div>
+
+                    <ul className="space-y-0.5">
+                      {assetsByCategory.map((cat) => (
+                        <li key={cat.label}>
+                          <Link
+                            href={cat.href}
+                            className="group block py-1.5 px-2 -mx-2 rounded-md hover:bg-background/60 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="h-2 w-2 rounded-full shrink-0"
+                                style={{ backgroundColor: cat.color }}
+                              />
+                              <span className="flex-1 min-w-0 text-xs text-foreground truncate">
+                                {cat.label}
+                              </span>
+                              <span className="text-xs font-mono tabular-nums text-foreground">
+                                {maskValue(formatCurrency(cat.amount, currency))}
+                              </span>
+                              <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </div>
+                            <div className="mt-1 ml-4 h-[3px] rounded-full bg-background/60 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${cat.pct}%`,
+                                  backgroundColor: cat.color,
+                                  opacity: 0.7,
+                                }}
+                              />
+                            </div>
+                          </Link>
+                        </li>
                       ))}
-                    </div>
-                  )}
+                    </ul>
+                  </div>
                 </div>
 
-                <div className="pt-4 border-t border-border flex items-center justify-between text-xs">
-                  <Link href="/assets" className="text-primary hover:underline font-medium">
-                    All assets →
-                  </Link>
-                  <Link href="/liabilities" className="text-primary hover:underline font-medium">
-                    All liabilities →
-                  </Link>
+                {/* Right Column: Liabilities */}
+                <div className="relative overflow-hidden border rounded-xl bg-destructive/5 border-destructive/20 flex flex-col justify-between">
+                  <span className="absolute inset-y-0 left-0 w-[3px] bg-destructive" aria-hidden="true" />
+                  <div className="pl-4 pr-3 pt-3 pb-3">
+                    <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                      <Link href="/liabilities" className="group flex items-center gap-1.5 min-w-0">
+                        <TrendingDown className="h-3.5 w-3.5 shrink-0 text-destructive" />
+                        <span className="text-xs font-bold text-foreground group-hover:text-destructive transition-colors">
+                          Liabilities
+                        </span>
+                      </Link>
+                      <span className="font-mono font-bold text-xl text-destructive">
+                        {maskValue(formatCurrency(totalLiabilities, currency))}
+                      </span>
+                    </div>
+
+                    {liabilities.length === 0 ? (
+                      <div className="py-4 text-center">
+                        <p className="text-xs text-muted-foreground mb-1.5">No debts tracked</p>
+                        <button
+                          onClick={() => setIsAddLiabilityOpen(true)}
+                          className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                        >
+                          Add liability →
+                        </button>
+                      </div>
+                    ) : (
+                      <ul className="space-y-1.5 pt-1">
+                        {liabilities.map((l) => (
+                          <li key={l.id} className="flex justify-between items-center text-xs">
+                            <span className="text-foreground font-medium truncate">{l.name}</span>
+                            <span className="font-mono text-destructive">
+                              {maskValue(
+                                formatCurrency(
+                                  convertAmount(l.outstandingAmount, l.currency, currency),
+                                  currency
+                                )
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* Bottom Quick Links */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <Link href="/accounts" className="hover:text-foreground transition-colors font-medium">
+                  Accounts →
+                </Link>
+                <Link href="/assets" className="hover:text-foreground transition-colors font-medium">
+                  All assets →
+                </Link>
+                <Link href="/liabilities" className="hover:text-foreground transition-colors font-medium">
+                  All liabilities →
+                </Link>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* =========================================================================
-            ROW 4: TOP INVESTMENTS & HOLDINGS (Image 1)
+            COLLAPSIBLE ACCORDION 2: INVESTMENTS
+            Matches FinBoom's Investments Accordion Section
            ========================================================================= */}
-        {assets.length > 0 && (
-          <div className="pt-2 space-y-4">
-            <div className="flex items-center justify-between pb-1 border-b border-border">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-                Top Holdings
-              </span>
-              <Link href="/assets" className="text-xs text-primary hover:underline font-semibold">
-                All assets ({assets.length}) →
-              </Link>
+        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+          <button
+            type="button"
+            onClick={() => setInvestmentsOpen(!investmentsOpen)}
+            className="w-full flex items-center gap-3 px-4 py-3 sm:py-3.5 text-left min-h-[52px] hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+          >
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                investmentsOpen ? 'rotate-180' : ''
+              }`}
+            />
+            <span className="shrink-0">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+            </span>
+            <div className="min-w-0 flex-1 flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground truncate">Investments</span>
             </div>
+          </button>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {assets.slice(0, 6).map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-card border border-border rounded-xl p-3.5 shadow-xs hover:border-primary/40 transition-all flex flex-col justify-between"
+          {investmentsOpen && (
+            <div className="border-t border-border bg-background p-4 sm:p-5 space-y-4">
+              {/* Purchase Price Prompt Card */}
+              <div className="rounded-xl border border-dashed border-border bg-card px-4 py-3 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Add purchase prices to your assets to track gain/loss here.
+                </p>
+                <Link
+                  href="/assets"
+                  className="inline-block mt-1.5 text-xs font-semibold text-primary hover:underline underline-offset-2"
                 >
-                  <div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase font-bold">
-                      {item.category}
+                  Update assets →
+                </Link>
+              </div>
+
+              {/* Top Holdings Card */}
+              <div className="relative overflow-hidden border border-border bg-card rounded-xl">
+                <span className="absolute inset-y-0 left-0 w-[3px] bg-amber-500" aria-hidden="true" />
+                <div className="pl-4 pr-3 pt-3 pb-2 flex items-baseline justify-between gap-2 border-b border-border/40">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-amber-500">
+                      <Coins className="h-3.5 w-3.5" />
                     </span>
-                    <h3 className="text-xs font-bold text-foreground mt-1.5 truncate" title={item.name}>
-                      {item.name}
-                    </h3>
-                    {item.subClass && (
-                      <p className="text-[11px] text-muted-foreground truncate">{item.subClass}</p>
+                    <span className="text-xs font-bold text-foreground">Top holdings</span>
+                  </div>
+                  <Link
+                    href="/assets"
+                    className="text-xs font-medium text-primary hover:underline underline-offset-2"
+                  >
+                    All assets →
+                  </Link>
+                </div>
+
+                <div>
+                  {/* Category Filter Pills */}
+                  <div className="flex flex-wrap gap-2 px-3 pt-3 pb-2">
+                    {(['ALL', 'EQUITY', 'CASH', 'COMMODITIES'] as const).map((filter) => {
+                      const label =
+                        filter === 'ALL'
+                          ? 'All'
+                          : filter === 'EQUITY'
+                          ? 'Equity'
+                          : filter === 'CASH'
+                          ? 'Cash & Savings'
+                          : 'Commodities';
+                      const isSelected = holdingsFilter === filter;
+                      return (
+                        <button
+                          key={filter}
+                          type="button"
+                          onClick={() => setHoldingsFilter(filter)}
+                          className={`relative inline-flex items-center min-h-8 px-3 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-foreground text-background'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Holdings 2-Column Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-3 pb-3">
+                    {filteredHoldings.length === 0 ? (
+                      <div className="col-span-2 py-4 text-center text-xs text-muted-foreground">
+                        No holdings found in this category.
+                      </div>
+                    ) : (
+                      filteredHoldings.map((item) => {
+                        const categoryPillClass =
+                          item.subClass === 'Savings Account' || item.category === 'CASH'
+                            ? 'bg-muted text-foreground'
+                            : item.subClass === 'ULIP'
+                            ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400'
+                            : item.subClass === 'Direct Stock' || item.category === 'EQUITY'
+                            ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-400'
+                            : (item.category as string) === 'COMMODITY' || (item.category as string) === 'COMMODITIES'
+                            ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400'
+                            : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400';
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="rounded-lg bg-muted/40 hover:bg-muted/60 p-3 space-y-1 transition-colors border border-transparent hover:border-border/60"
+                          >
+                            <div className="text-xs text-muted-foreground truncate font-medium" title={item.name}>
+                              {item.name}
+                            </div>
+                            <div className="text-sm font-semibold font-mono tabular-nums text-foreground">
+                              {maskValue(
+                                formatCurrency(
+                                  convertAmount(item.currentValue, item.currentCurrency, currency),
+                                  currency
+                                )
+                              )}
+                            </div>
+                            <span
+                              className={`inline-block max-w-full truncate px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryPillClass}`}
+                            >
+                              {item.subClass || item.category}
+                            </span>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
-                  <div className="mt-3 pt-2 border-t border-border/60 flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold text-foreground">
-                      {maskValue(formatCurrency(convertAmount(item.currentValue, item.currentCurrency, currency), currency))}
-                    </span>
-                    <Link href="/assets" className="text-[11px] text-primary hover:underline font-medium">
-                      View →
-                    </Link>
-                  </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* =========================================================================
+            COLLAPSIBLE ACCORDION 3: GOALS
+            Matches FinBoom's Goals Accordion Section
+           ========================================================================= */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+          <button
+            type="button"
+            onClick={() => setGoalsOpen(!goalsOpen)}
+            className="w-full flex items-center gap-3 px-4 py-3 sm:py-3.5 text-left min-h-[52px] hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+          >
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                goalsOpen ? 'rotate-180' : ''
+              }`}
+            />
+            <span className="shrink-0">
+              <Target className="h-4 w-4 text-amber-500" />
+            </span>
+            <div className="min-w-0 flex-1 flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground truncate">Goals</span>
+              <span className="text-xs font-mono font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                {activeGoalList.length}
+              </span>
+            </div>
+            <div className="font-semibold text-xs sm:text-sm text-foreground shrink-0 font-mono">
+              +{primaryGoalPct}%
+            </div>
+            <span className="text-[10px] font-bold font-mono uppercase tracking-wider text-amber-600 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded">
+              1 OFF-TRACK
+            </span>
+          </button>
+
+          {goalsOpen && (
+            <div className="border-t border-border bg-background">
+              <div className="px-5 py-4">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-sm font-medium text-foreground">
+                    {primaryGoal.name}
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {maskValue(formatCurrency(primaryGoal.targetAmount, currency))} by {primaryGoalYear}
+                  </span>
+                </div>
+
+                <div className="h-[5px] bg-border rounded-[3px] overflow-hidden mb-1.5">
+                  <div
+                    className="h-full bg-primary rounded-[3px] transition-all duration-500"
+                    style={{ width: `${Math.min(primaryGoalPct, 100)}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
+                  <span>{primaryGoalPct}% complete</span>
+                  <span>
+                    invest {maskValue(formatCurrency(primaryGoal.monthlyContribution || 50000, currency))}/mo
+                  </span>
+                </div>
+              </div>
+
+              <div className="px-4 py-3 flex justify-end border-t border-border/40">
+                <Link
+                  href="/goals"
+                  className="text-xs font-medium text-primary hover:underline underline-offset-2"
+                >
+                  Manage →
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* =========================================================================
             ROW 5: WEALTH TRAJECTORY CHART & DONUT ALLOCATION
