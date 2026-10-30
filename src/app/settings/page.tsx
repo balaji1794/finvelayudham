@@ -17,10 +17,12 @@ import {
   AlertTriangle,
   Copy,
   Check,
+  Laptop,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import { useAuth } from '@/context/AuthContext';
 import { usePrivacy } from '@/context/PrivacyContext';
+import { isDeviceTrusted, setDeviceTrusted, getDeviceLabel } from '@/lib/trusted-device';
 import {
   loadUserPortfolio,
   saveUserPortfolio,
@@ -56,6 +58,29 @@ export default function SettingsPage() {
   const [editPassword, setEditPassword] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [deviceTrusted, setDeviceTrustedState] = useState(false);
+  const [currentDevice, setCurrentDevice] = useState('');
+
+  useEffect(() => {
+    if (user?.email) {
+      setDeviceTrustedState(isDeviceTrusted(user.email));
+      setCurrentDevice(getDeviceLabel());
+    }
+  }, [user]);
+
+  const handleToggleDeviceTrust = () => {
+    if (!user?.email) return;
+    const nextState = !deviceTrusted;
+    setDeviceTrusted(user.email, nextState);
+    setDeviceTrustedState(nextState);
+    setFeedback({
+      type: 'success',
+      message: nextState
+        ? 'This browser has been marked as a trusted device. Login verification code will be bypassed.'
+        : 'Device trust revoked. Email verification code will be required on your next login.',
+    });
+    setTimeout(() => setFeedback(null), 4000);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -310,12 +335,53 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={savingProfile}
-                  className="px-4 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className="px-4 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
                 >
                   {savingProfile ? 'Saving...' : 'Save Profile Changes'}
                 </button>
               </div>
             </form>
+
+            {/* Trusted Device & 2FA Security */}
+            <div className="pt-4 border-t border-border">
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
+                Trusted Browsers & Two-Step Verification
+              </h3>
+              <div className="p-3.5 rounded-lg border border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Laptop className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-medium text-foreground">{currentDevice || 'Current Browser'}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                        deviceTrusted
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          : 'bg-muted text-muted-foreground border-border'
+                      }`}
+                    >
+                      {deviceTrusted ? 'Trusted Device' : 'Untrusted Device'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {deviceTrusted
+                      ? 'Email verification code is skipped on this browser during sign-in.'
+                      : 'You will be asked for a 6-digit email verification code when signing in.'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleToggleDeviceTrust}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors shrink-0 cursor-pointer ${
+                    deviceTrusted
+                      ? 'border-border bg-background hover:bg-muted text-foreground'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary'
+                  }`}
+                >
+                  {deviceTrusted ? 'Revoke Device Trust' : 'Trust This Device'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

@@ -5,7 +5,7 @@ import { deriveUserIdFromEmail } from '@/lib/portfolio-vault';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password } = body;
+    const { email, password, checkOnly } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -22,6 +22,20 @@ export async function POST(req: Request) {
         { success: false, error: result.error || 'Invalid credentials' },
         { status: 401 }
       );
+    }
+
+    // If checkOnly is requested, return valid status without issuing session cookie
+    if (checkOnly) {
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: result.account.id,
+          email: result.account.email,
+          name: result.account.name,
+          createdAt: result.account.createdAt,
+          isVerified: result.account.isVerified,
+        },
+      });
     }
 
     const response = NextResponse.json({

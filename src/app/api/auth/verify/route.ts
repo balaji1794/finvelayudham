@@ -18,7 +18,7 @@ function signVerification(email: string, code: string, expiresAt: number): strin
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, email, code, name, verifyToken } = body;
+    const { action, email, code, name, verifyToken, type = 'register' } = body;
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'Valid email address is required' }, { status: 400 });
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
       const userName = name || 'Valued Member';
+      const isLogin = type === 'login';
 
       // In-memory cache
       verificationStore.set(cleanEmail, {
@@ -53,7 +54,9 @@ export async function POST(req: Request) {
       const fromEmail = process.env.EMAIL_FROM || (smtpUser ? `FinVelayudham <${smtpUser}>` : 'FinVelayudham <onboarding@resend.dev>');
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://finvelayudham.vercel.app';
 
-      const emailSubject = `${generatedCode} is your FinVelayudham confirmation code`;
+      const emailSubject = isLogin
+        ? `${generatedCode} is your FinVelayudham login security code`
+        : `${generatedCode} is your FinVelayudham confirmation code`;
 
       const emailHtml = `
 <!DOCTYPE html>
@@ -77,20 +80,24 @@ export async function POST(req: Request) {
   <div class="card">
     <div style="text-align: center;">
       <a href="${appUrl}" class="brand">FinVelayudham.</a><br/>
-      <span class="badge">Email Verification</span>
+      <span class="badge">${isLogin ? 'Security Verification' : 'Email Verification'}</span>
     </div>
 
     <h1>Hello ${userName},</h1>
-    <p>Please confirm your email address to unlock your private FinVelayudham wealth vault.</p>
+    <p>${isLogin
+      ? 'A sign-in attempt was initiated for your FinVelayudham account from a new browser or device. Use the verification code below to complete your sign-in.'
+      : 'Please confirm your email address to unlock your private FinVelayudham wealth vault.'}</p>
 
     <div class="code-box">
-      <div style="font-size: 12px; text-transform: uppercase; font-weight: 600; color: #166534; margin-bottom: 6px;">Your 6-Digit Confirmation Code</div>
+      <div style="font-size: 12px; text-transform: uppercase; font-weight: 600; color: #166534; margin-bottom: 6px;">Your 6-Digit ${isLogin ? 'Security' : 'Confirmation'} Code</div>
       <div class="otp-code">${generatedCode}</div>
       <div style="font-size: 11px; color: #64748b; margin-top: 8px;">Expires in 15 minutes</div>
     </div>
 
     <p style="font-size: 12px; color: #64748b;">
-      If you did not request this email, no further action is required. Your account will not be created without this code.
+      ${isLogin
+        ? 'If you did not initiate this sign-in attempt, someone may have entered your email. Since your password was verified, consider changing your password in Settings.'
+        : 'If you did not request this email, no further action is required. Your account will not be created without this code.'}
     </p>
 
     <div class="footer">

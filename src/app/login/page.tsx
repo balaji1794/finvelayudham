@@ -1,10 +1,26 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import {
+  Mail,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Laptop,
+  Lock,
+  RefreshCw,
+  KeyRound,
+  CheckCircle2,
+  AlertCircle,
+  ArrowLeft,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { isDeviceTrusted, setDeviceTrusted, getDeviceLabel } from '@/lib/trusted-device';
+
+type Step = 'credentials' | 'verify-code' | 'trust-device';
 
 function LoginForm() {
   const router = useRouter();
@@ -15,6 +31,7 @@ function LoginForm() {
   const [mode, setMode] = useState<'login' | 'register'>(
     isRegisterParam ? 'register' : 'login'
   );
+  const [step, setStep] = useState<Step>('credentials');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,14 +39,47 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [registrationSuccess, setRegistrationSuccess] = useState<{ email: string } | null>(null);
 
-  const { login, register, loginWithGoogle } = useAuth();
+  // 2FA verification code state
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifiedName, setVerifiedName] = useState('');
+  const [pendingSandboxCode, setPendingSandboxCode] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [deviceLabel, setDeviceLabel] = useState('This Browser');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const {
+    login,
+    verifyCredentialsOnly,
+    register,
+    requestVerification,
+    confirmVerification,
+    completeVerifiedLogin,
+    loginWithGoogle,
+  } = useAuth();
+
+  // Detect friendly device name on mount
+  useEffect(() => {
+    setDeviceLabel(getDeviceLabel());
+  }, []);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // -------------------------------------------------------------
+  // STEP 1: CREDENTIALS SUBMISSION (Email + Password)
+  // -------------------------------------------------------------
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    const cleanEmail = email.trim().toLowerCase();
 
     try {
       if (mode === 'register') {
@@ -45,30 +95,161 @@ function LoginForm() {
           return;
         }
 
-        const res = await register(email, name, password);
-        if (res.success) {
-          setRegistrationSuccess({ email: email.trim().toLowerCase() });
-        } else {
-          setError(res.message || 'Registration could not be completed. Please try again.');
+        // Send registration confirmation code
+        const codeRes = await requestVerification(cleanEmail, name.trim(), 'register');
+        if (!codeRes.success) {
+          setError(codeRes.message || 'Could not dispatch verification code. Please try again.');
+          setLoading(false);
+          return;
         }
+
+        setVerifiedName(name.trim());
+        if (codeRes.sandboxCode) {
+          setPendingSandboxCode(codeRes.sandboxCode);
+        }
+        setResendCooldown(30);
+        setStep('verify-code');
         setLoading(false);
         return;
       }
 
-      // Mode is 'login'
-      const res = await login(email, name, password);
-      if (res.success) {
-        router.push(redirectUrl);
-      } else {
-        setError(res.message || 'Invalid email or password.');
+      // Mode is 'login':
+      // 1. Strictly verify that the password matches first
+      const credResult = await verifyCredentialsOnly(cleanEmail, password);
+      if (!credResult.success) {
+        setError(credResult.message || 'Incorrect password. Please try again.');
         setLoading(false);
+        return;
       }
+
+      const memberName = credResult.name || name || 'Member';
+      setVerifiedName(memberName);
+
+      // 2. Check if this browser is already trusted for this user
+      const trusted = isDeviceTrusted(cleanEmail);
+      if (trusted) {
+        // Trusted device: bypass 2FA email code completely!
+        const loginRes = await completeVerifiedLogin(cleanEmail, memberName, password, true);
+        if (loginRes.success) {
+          router.push(redirectUrl);
+          return;
+        }
+      }
+
+      // 3. Untrusted device: dispatch email verification code
+      const codeRes = await requestVerification(cleanEmail, memberName, 'login');
+      if (codeRes.sandboxCode) {
+        setPendingSandboxCode(codeRes.sandboxCode);
+      }
+      setResendCooldown(30);
+      setStep('verify-code');
+      setLoading(false);
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError('An unexpected error occurred. Please try again.');
       setLoading(false);
     }
   };
 
+  // -------------------------------------------------------------
+  // STEP 2: CODE VERIFICATION (6-digit OTP confirmation)
+  // -------------------------------------------------------------
+  const handleVerifyCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const cleanCode = verificationCode.trim();
+    if (cleanCode.length !== 6) {
+      setError('Please enter the full 6-digit verification code.');
+      return;
+    }
+
+    setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+
+    try {
+      const confirmRes = await confirmVerification(
+        cleanEmail,
+        cleanCode,
+        password,
+        verifiedName || name
+      );
+
+      if (!confirmRes.success) {
+        setError(
+          confirmRes.error ||
+            'Incorrect or expired confirmation code. Please check your email and try again.'
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Code matched! Move to Step 3: Ask if this is a trusted device
+      setStep('trust-device');
+      setLoading(false);
+    } catch {
+      setError('Could not verify code. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // RESEND CODE ACTION
+  // -------------------------------------------------------------
+  const handleResendCode = async () => {
+    if (resendCooldown > 0 || loading) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const codeRes = await requestVerification(
+        cleanEmail,
+        verifiedName || name || 'Member',
+        mode === 'register' ? 'register' : 'login'
+      );
+
+      if (codeRes.sandboxCode) {
+        setPendingSandboxCode(codeRes.sandboxCode);
+      }
+      setResendCooldown(30);
+    } catch {
+      setError('Failed to resend verification code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // STEP 3: TRUSTED DEVICE CONFIRMATION
+  // -------------------------------------------------------------
+  const handleTrustDeviceDecision = async (trusted: boolean) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const loginRes = await completeVerifiedLogin(
+        cleanEmail,
+        verifiedName || name,
+        password,
+        trusted
+      );
+
+      if (loginRes.success) {
+        router.push(redirectUrl);
+      } else {
+        setError(loginRes.message || 'Could not complete session setup.');
+        setLoading(false);
+      }
+    } catch {
+      setError('Failed to finish login. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // GOOGLE SIGN IN
+  // -------------------------------------------------------------
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
@@ -83,13 +264,14 @@ function LoginForm() {
     }
   };
 
-  // -------------------------------------------------------------
-  // SCREEN 1: REGISTRATION SUCCESS ("Check your inbox")
-  // -------------------------------------------------------------
-  if (registrationSuccess) {
+  // =============================================================
+  // RENDER: STEP 2 - ENTER VERIFICATION CODE
+  // =============================================================
+  if (step === 'verify-code') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-        <div className="w-full max-w-sm space-y-5">
+        <div className="w-full max-w-sm space-y-6">
+          {/* Header */}
           <div className="text-center">
             <Link href="/" className="inline-block">
               <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">
@@ -98,55 +280,211 @@ function LoginForm() {
             </Link>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-6 text-center shadow-sm">
-            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 mb-3 mx-auto">
-              <Mail className="h-6 w-6 text-primary" />
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 mx-auto text-primary">
+                <KeyRound className="h-6 w-6" />
+              </div>
+              <h2 className="font-serif text-xl font-bold text-foreground">
+                Two-Step Verification
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                We sent a 6-digit security code to{' '}
+                <span className="font-semibold text-foreground break-all">{email}</span>.
+                Enter it below to confirm your identity.
+              </p>
             </div>
 
-            <h2 className="font-serif text-2xl font-bold mb-1.5 text-foreground">
-              Check your inbox
-            </h2>
+            {/* Sandbox / Testing Helper Pill (Shown when running in dev/sandbox mode) */}
+            {pendingSandboxCode && (
+              <div
+                onClick={() => setVerificationCode(pendingSandboxCode)}
+                className="cursor-pointer bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-lg p-2.5 text-center transition-all group"
+                title="Click to auto-fill development code"
+              >
+                <div className="text-[11px] font-medium text-primary flex items-center justify-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Testing Code: <span className="font-mono font-bold tracking-wider">{pendingSandboxCode}</span>
+                  <span className="text-[10px] text-muted-foreground group-hover:text-primary transition-colors">
+                    (Click to paste)
+                  </span>
+                </div>
+              </div>
+            )}
 
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              We sent a link to{' '}
-              <span className="font-semibold text-foreground break-all">
-                {registrationSuccess.email}
-              </span>
-              . Open it to verify your address, then you can add and edit your data.
-            </p>
+            {/* OTP Form */}
+            <form onSubmit={handleVerifyCodeSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="verificationCode"
+                  className="block text-xs font-medium text-muted-foreground mb-1.5 text-center"
+                >
+                  Enter 6-Digit Code
+                </label>
+                <input
+                  id="verificationCode"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  value={verificationCode}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setVerificationCode(val);
+                  }}
+                  placeholder="000000"
+                  className="w-full h-12 px-3 text-center font-mono text-2xl font-bold tracking-[0.4em] rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-primary shadow-xs"
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={() => router.push(redirectUrl)}
-              className="w-full mt-5 h-10 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all text-sm flex items-center justify-center gap-2 shadow-sm"
-            >
-              Continue to setup
-              <ArrowRight className="w-4 h-4" />
-            </button>
+              {error && (
+                <div className="flex items-start gap-2 p-3 text-xs text-destructive bg-destructive/10 rounded-lg">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <p>{error}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || verificationCode.length !== 6}
+                className="w-full h-10 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all text-sm flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    Verify & Continue
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Resend and Navigation */}
+            <div className="space-y-2 pt-2 border-t border-border/80 text-center text-xs">
+              <div>
+                {resendCooldown > 0 ? (
+                  <span className="text-muted-foreground">
+                    Resend code in <strong className="text-foreground">{resendCooldown}s</strong>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendCode}
+                    disabled={loading}
+                    className="text-primary hover:underline font-medium cursor-pointer"
+                  >
+                    Didn&apos;t receive code? Resend
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('credentials');
+                    setVerificationCode('');
+                    setError('');
+                  }}
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  Back to credentials
+                </button>
+              </div>
+            </div>
           </div>
-
-          <p className="text-center text-xs text-muted-foreground">
-            <button
-              type="button"
-              onClick={() => {
-                setRegistrationSuccess(null);
-                setMode('login');
-                setPassword('');
-                setError('');
-              }}
-              className="text-primary hover:underline font-medium"
-            >
-              Back to sign in
-            </button>
-          </p>
         </div>
       </div>
     );
   }
 
-  // -------------------------------------------------------------
-  // SCREEN 2: LOGIN / REGISTER FORMS (Matched directly to FinBoom)
-  // -------------------------------------------------------------
+  // =============================================================
+  // RENDER: STEP 3 - ASK IF THIS IS A TRUSTED DEVICE
+  // =============================================================
+  if (step === 'trust-device') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+        <div className="w-full max-w-sm space-y-6">
+          {/* Header */}
+          <div className="text-center">
+            <Link href="/" className="inline-block">
+              <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">
+                FinVelayudham<span className="text-primary font-sans">.</span>
+              </h1>
+            </Link>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5 text-center">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-emerald-500/10 mx-auto text-emerald-600 dark:text-emerald-400">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h2 className="font-serif text-xl font-bold text-foreground">
+                Trust this device?
+              </h2>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-[11px] font-mono text-muted-foreground">
+                <Laptop className="w-3 h-3" />
+                {deviceLabel}
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              If you trust this browser, you won&apos;t be asked for a verification code when signing in
+              in the future. Only choose this on your private, personal computer or phone.
+            </p>
+
+            {error && (
+              <div className="flex items-start gap-2 p-3 text-xs text-destructive bg-destructive/10 rounded-lg text-left">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p>{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-2.5 pt-2">
+              {/* Option 1: Yes, trust this device */}
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleTrustDeviceDecision(true)}
+                className="w-full h-10 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {loading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    Yes, trust this device
+                  </>
+                )}
+              </button>
+
+              {/* Option 2: Don't trust (Public / shared device) */}
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleTrustDeviceDecision(false)}
+                className="w-full h-10 rounded-lg border border-border bg-background text-foreground hover:bg-muted font-medium transition-all text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                Don&apos;t trust (Public or shared computer)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =============================================================
+  // RENDER: STEP 1 - CREDENTIALS (FinBoom Design Matched)
+  // =============================================================
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-sm space-y-6">
@@ -167,7 +505,7 @@ function LoginForm() {
           type="button"
           disabled={loading}
           onClick={handleGoogleSignIn}
-          className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-10 rounded-md px-6 w-full"
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-10 rounded-md px-6 w-full cursor-pointer"
         >
           <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24">
             <path
@@ -203,7 +541,7 @@ function LoginForm() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleCredentialsSubmit} className="space-y-3">
           {mode === 'register' && (
             <div>
               <label htmlFor="name" className="block text-xs font-medium text-muted-foreground mb-1">
@@ -254,7 +592,7 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -267,7 +605,7 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => setError('Password reset instructions will be sent to your email.')}
-                className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                className="text-xs text-muted-foreground hover:text-primary hover:underline cursor-pointer"
               >
                 Forgot password?
               </button>
@@ -283,15 +621,18 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all bg-primary text-primary-foreground hover:bg-primary/90 h-10 rounded-md px-6 w-full shadow-sm disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all bg-primary text-primary-foreground hover:bg-primary/90 h-10 rounded-md px-6 w-full shadow-sm disabled:opacity-50 cursor-pointer"
           >
-            {loading
-              ? mode === 'register'
-                ? 'Creating account...'
-                : 'Signing in...'
-              : mode === 'register'
-              ? 'Create account'
-              : 'Sign in'}
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                {mode === 'register' ? 'Creating account...' : 'Verifying...'}
+              </>
+            ) : mode === 'register' ? (
+              'Create account'
+            ) : (
+              'Sign in'
+            )}
           </button>
         </form>
 
@@ -306,7 +647,7 @@ function LoginForm() {
                   setMode('register');
                   setError('');
                 }}
-                className="text-primary hover:underline font-medium"
+                className="text-primary hover:underline font-medium cursor-pointer"
               >
                 Create one
               </button>
@@ -320,7 +661,7 @@ function LoginForm() {
                   setMode('login');
                   setError('');
                 }}
-                className="text-primary hover:underline font-medium"
+                className="text-primary hover:underline font-medium cursor-pointer"
               >
                 Sign in
               </button>

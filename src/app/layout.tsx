@@ -49,6 +49,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <meta name="theme-color" content="#2c6e49" />
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -58,23 +61,29 @@ export default function RootLayout({
                     var k = 'fv_chunk_reload';
                     var last = sessionStorage.getItem(k);
                     var now = Date.now();
-                    if (!last || now - Number(last) > 8000) {
+                    if (!last || (now - Number(last)) > 10000) {
                       sessionStorage.setItem(k, String(now));
-                      window.location.href = window.location.pathname + '?reload=' + now;
+                      if ('caches' in window) {
+                        caches.keys().then(function(names) {
+                          names.forEach(function(n) { caches.delete(n); });
+                        });
+                      }
+                      var cleanUrl = window.location.origin + window.location.pathname;
+                      window.location.replace(cleanUrl + '?_v=' + now);
                     }
                   } catch(e) {
-                    window.location.href = window.location.pathname + '?reload=' + Date.now();
+                    window.location.reload();
                   }
                 }
                 window.addEventListener('error', function(e) {
-                  var msg = e && (e.message || '');
-                  if (msg.indexOf('Loading chunk') !== -1 || msg.indexOf('ChunkLoadError') !== -1 || msg.indexOf('Failed to fetch dynamically imported module') !== -1) {
+                  var msg = (e && (e.message || (e.error && e.error.message))) || '';
+                  if (typeof msg === 'string' && (msg.indexOf('Loading chunk') !== -1 || msg.indexOf('ChunkLoadError') !== -1 || msg.indexOf('Failed to fetch dynamically imported module') !== -1)) {
                     tryReload();
                   }
                 });
                 window.addEventListener('unhandledrejection', function(e) {
-                  var reason = e && e.reason && (e.reason.message || String(e.reason)) || '';
-                  if (reason.indexOf('Loading chunk') !== -1 || reason.indexOf('ChunkLoadError') !== -1 || reason.indexOf('Failed to fetch dynamically imported module') !== -1) {
+                  var reason = (e && e.reason && (e.reason.message || String(e.reason))) || '';
+                  if (typeof reason === 'string' && (reason.indexOf('Loading chunk') !== -1 || reason.indexOf('ChunkLoadError') !== -1 || reason.indexOf('Failed to fetch dynamically imported module') !== -1)) {
                     tryReload();
                   }
                 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { RefreshCw, ArrowLeft, AlertCircle } from 'lucide-react';
 
@@ -11,28 +11,52 @@ export default function ErrorBoundary({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [reloading, setReloading] = useState(false);
+
+  const handleHardReload = () => {
+    setReloading(true);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('finvelayudham_chunk_reload');
+        if ('caches' in window) {
+          caches.keys().then((names) => {
+            names.forEach((name) => caches.delete(name));
+          });
+        }
+      } catch {}
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.location.replace(`${cleanUrl}?_ts=${Date.now()}`);
+    }
+  };
+
   useEffect(() => {
     console.error('Captured client application error:', error);
 
     // Auto-reload on chunk load failure (stale cache after new deployment)
     const isChunkError =
-      error.message?.includes('Loading chunk') ||
-      error.message?.includes('ChunkLoadError') ||
-      error.message?.includes('Failed to fetch dynamically imported module');
+      error?.message?.includes('Loading chunk') ||
+      error?.message?.includes('ChunkLoadError') ||
+      error?.message?.includes('Failed to fetch dynamically imported module');
 
     if (isChunkError && typeof window !== 'undefined') {
       try {
         const reloadKey = 'finvelayudham_chunk_reload';
         const lastReload = sessionStorage.getItem(reloadKey);
         const now = Date.now();
-        // Prevent reload loops (max once every 8 seconds)
-        if (!lastReload || now - Number(lastReload) > 8000) {
+        // Prevent reload loops (max once every 12 seconds)
+        if (!lastReload || now - Number(lastReload) > 12000) {
           sessionStorage.setItem(reloadKey, String(now));
-          window.location.href = window.location.pathname + '?reload=' + Date.now();
+          if ('caches' in window) {
+            caches.keys().then((names) => {
+              names.forEach((name) => caches.delete(name));
+            });
+          }
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.location.replace(`${cleanUrl}?_ts=${now}`);
         }
       } catch {
         // Fallback for Brave Shields / private mode where sessionStorage is restricted
-        window.location.href = window.location.pathname + '?reload=' + Date.now();
+        window.location.replace(window.location.pathname + '?_ts=' + Date.now());
       }
     }
   }, [error]);
@@ -56,15 +80,12 @@ export default function ErrorBoundary({
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <button
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.location.href = window.location.pathname + '?reload=' + Date.now();
-              }
-            }}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-sm"
+            onClick={handleHardReload}
+            disabled={reloading}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-sm disabled:opacity-50"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Reload Page
+            <RefreshCw className={`w-3.5 h-3.5 ${reloading ? 'animate-spin' : ''}`} />
+            {reloading ? 'Refreshing...' : 'Reload Page'}
           </button>
 
           <button

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { deriveUserIdFromEmail, loadUserPortfolio, saveUserPortfolio, UserPortfolio } from '@/lib/portfolio-vault';
 import { hashCredentials } from '@/lib/crypto';
+import { isDeviceTrusted, setDeviceTrusted } from '@/lib/trusted-device';
 
 export interface User {
   id: string;
@@ -17,9 +18,11 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, name?: string, password?: string) => Promise<{ success: boolean; emailSent?: boolean; message?: string }>;
+  verifyCredentialsOnly: (email: string, password?: string) => Promise<{ success: boolean; name?: string; message?: string }>;
   register: (email: string, name: string, password?: string) => Promise<{ success: boolean; emailSent?: boolean; message?: string }>;
-  requestVerification: (email: string, name: string) => Promise<{ success: boolean; delivered?: boolean; deliveredTo?: string; sandboxCode?: string; message?: string }>;
+  requestVerification: (email: string, name: string, type?: 'register' | 'login') => Promise<{ success: boolean; delivered?: boolean; deliveredTo?: string; sandboxCode?: string; message?: string }>;
   confirmVerification: (email: string, code: string, password?: string, name?: string) => Promise<{ success: boolean; error?: string }>;
+  completeVerifiedLogin: (email: string, name?: string, password?: string, trustDevice?: boolean) => Promise<{ success: boolean; emailSent?: boolean; message?: string }>;
   loginWithGoogle: (email?: string, name?: string) => Promise<{ success: boolean; emailSent?: boolean; message?: string }>;
   updateProfile: (updates: { name?: string; email?: string; newPassword?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -107,12 +110,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const requestVerification = async (email: string, name: string) => {
+  const requestVerification = async (email: string, name: string, type: 'register' | 'login' = 'register') => {
     try {
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-code', email, name }),
+        body: JSON.stringify({ action: 'send-code', email, name, type }),
       });
       const data = await res.json();
       if (data.token) {
@@ -122,6 +125,145 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       return { success: false, message: err.message || 'Failed to dispatch code' };
     }
+  };
+
+  const verifyCredentialsOnly = async (email: string, password?: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Please enter a valid email address.' };
+    }
+    if (!password) {
+      return { success: false, message: 'Please enter your password.' };
+    }
+
+    // 1. Check client-side account store
+    let localChecked = false;
+    try {
+      const stored = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+      if (stored) {
+        const accounts = JSON.parse(stored);
+        if (accounts && accounts[cleanEmail]) {
+          localChecked = true;
+          const inputHash = await hashCredentials(password, cleanEmail);
+          if (accounts[cleanEmail].passwordHash === inputHash) {
+            return {
+              success: true,
+              name: accounts[cleanEmail].name || deriveNameFromEmail(cleanEmail),
+            };
+          } else {
+            return {
+              success: false,
+              message: 'Incorrect password. Please try again.',
+            };
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Check server API store (/api/auth/login with checkOnly: true)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password, checkOnly: true }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          name: data.user?.name || deriveNameFromEmail(cleanEmail),
+        };
+      }
+      if (data.error === 'Incorrect password. Please try again.') {
+        return {
+          success: false,
+          message: 'Incorrect password. Please try again.',
+        };
+      }
+      if (data.error) {
+        return {
+          success: false,
+          message: data.error,
+        };
+      }
+    } catch {
+      // offline fallback
+    }
+
+    if (localChecked) {
+      return {
+        success: false,
+        message: 'Incorrect password. Please try again.',
+      };
+    }
+
+    return {
+      success: false,
+      message: 'No account found with this email. Please check your email or create an account.',
+    };
+  };
+
+  const completeVerifiedLogin = async (
+    email: string,
+    customName?: string,
+    password?: string,
+    trustDevice?: boolean
+  ) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const displayName = customName && customName.trim() ? customName.trim() : deriveNameFromEmail(cleanEmail);
+
+    // Save or clear trusted device token
+    if (typeof trustDevice === 'boolean') {
+      setDeviceTrusted(cleanEmail, trustDevice);
+    }
+
+    // Hash and store credentials in local client store if provided
+    if (password) {
+      try {
+        const pHash = await hashCredentials(password, cleanEmail);
+        const stored = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+        const accounts = stored ? JSON.parse(stored) : {};
+        accounts[cleanEmail] = {
+          email: cleanEmail,
+          name: displayName,
+          passwordHash: pHash,
+          updatedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+      } catch {}
+    }
+
+    const sessionUser: User = {
+      id: deriveUserIdFromEmail(cleanEmail),
+      email: cleanEmail,
+      name: displayName,
+      createdAt: new Date().toISOString(),
+      isVerified: true,
+    };
+
+    setUser(sessionUser);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
+      document.cookie = `finvelayudham_session=${encodeURIComponent(sessionUser.email)}; path=/; max-age=2592000; SameSite=Lax`;
+    } catch (err) {
+      console.warn('Could not persist session:', err);
+    }
+
+    // Call server to establish server session cookie
+    if (password) {
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password }),
+      }).catch(() => {});
+    }
+
+    const emailResult = await dispatchWelcomeEmail(cleanEmail, displayName, 'login');
+    return {
+      success: true,
+      emailSent: emailResult.delivered,
+      message: emailResult.message,
+    };
   };
 
   const confirmVerification = async (email: string, code: string, password?: string, customName?: string) => {
@@ -503,9 +645,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isLoading,
         login,
+        verifyCredentialsOnly,
         register,
         requestVerification,
         confirmVerification,
+        completeVerifiedLogin,
         loginWithGoogle,
         updateProfile,
         logout,
