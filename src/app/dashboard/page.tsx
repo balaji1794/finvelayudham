@@ -12,6 +12,8 @@ import {
   Coins,
   CreditCard,
   UploadCloud,
+  Download,
+  Upload,
   CheckCircle2,
   Sparkles,
   ShieldCheck,
@@ -189,6 +191,120 @@ export default function DashboardPage() {
     setSnapshots(starter.snapshots);
     setLastSaved(starter.updatedAt);
     setVaultLoading(false);
+  };
+
+  // Export whole vault data in a single file
+  const handleExportWholeVault = async () => {
+    if (!user) return;
+    try {
+      const currentVault = await loadUserPortfolio(user.id, user.email);
+      const wholeData = {
+        ...currentVault,
+        assets,
+        liabilities,
+        snapshots,
+        transactions,
+        goals,
+        exportedAt: new Date().toISOString(),
+        version: '2.0',
+      };
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(wholeData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute(
+        'download',
+        `finvelayudham_vault_backup_${(user.email || 'user').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`
+      );
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setSaveBanner(`Exported whole portfolio data (${assets.length} assets, ${goals.length} goals) to single backup file!`);
+      setTimeout(() => setSaveBanner(''), 4000);
+    } catch (err: any) {
+      setSaveBanner(err.message || 'Export failed.');
+      setTimeout(() => setSaveBanner(''), 4000);
+    }
+  };
+
+  // Import whole vault data from a single file
+  const handleImportWholeVault = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        if (!text) throw new Error('File is empty.');
+
+        if (file.name.endsWith('.json') || text.trim().startsWith('{')) {
+          const parsed = JSON.parse(text);
+          const newAssets = Array.isArray(parsed.assets) ? parsed.assets : [];
+          const newLiabilities = Array.isArray(parsed.liabilities) ? parsed.liabilities : [];
+          const newSnapshots = Array.isArray(parsed.snapshots) ? parsed.snapshots : [];
+          const newTransactions = Array.isArray(parsed.transactions) ? parsed.transactions : [];
+          const newGoals = Array.isArray(parsed.goals) ? parsed.goals : goals;
+
+          setAssets(newAssets);
+          setLiabilities(newLiabilities);
+          setSnapshots(newSnapshots);
+          setTransactions(newTransactions);
+          setGoals(newGoals);
+          if (parsed.currency) setCurrency(parsed.currency);
+
+          const newVault: UserPortfolio = {
+            userId: user.id,
+            email: user.email,
+            currency: parsed.currency || currency,
+            assets: newAssets,
+            liabilities: newLiabilities,
+            snapshots: newSnapshots,
+            transactions: newTransactions,
+            goals: newGoals,
+            updatedAt: new Date().toISOString(),
+            isEncrypted: true,
+          };
+          await saveUserPortfolio(newVault);
+          setSaveBanner(`Successfully imported whole dataset (${newAssets.length} assets, ${newGoals.length} goals) from single file!`);
+          setTimeout(() => setSaveBanner(''), 4000);
+          return;
+        }
+
+        // CSV Statement Fallback
+        if (text.includes('Stock Name') && text.includes('ISIN')) {
+          const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+          let headerIdx = lines.findIndex((l) => l.includes('Stock Name') && l.includes('ISIN'));
+          if (headerIdx === -1) headerIdx = 0;
+          const newAssets: Asset[] = [];
+          for (let i = headerIdx + 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map((p) => p.trim().replace(/^"|"$/g, ''));
+            if (cols.length < 7 || !cols[0]) continue;
+            const isSgb = cols[0].toUpperCase().includes('GOLDBOND') || cols[0].toUpperCase().includes('SGB') || cols[0].toUpperCase().includes('GOLD');
+            newAssets.push({
+              id: 'stk_' + cols[1].toLowerCase() + '_' + Math.random().toString(36).substring(2, 7),
+              name: cols[0],
+              productType: isSgb ? 'SGB' : 'Stock',
+              category: isSgb ? 'COMMODITY' : 'EQUITY',
+              subClass: isSgb ? 'Sovereign Gold Bond' : 'Direct Equity',
+              currentValue: parseFloat(cols[6]) || 0,
+              investedAmount: parseFloat(cols[4]) || 0,
+              currentCurrency: 'INR',
+              geographyTag: 'DOMESTIC',
+            });
+          }
+          const merged = [...assets, ...newAssets];
+          setAssets(merged);
+          const vault = await loadUserPortfolio(user.id, user.email);
+          await saveUserPortfolio({ ...vault, assets: merged });
+          setSaveBanner(`Imported ${newAssets.length} holdings from statement file!`);
+          setTimeout(() => setSaveBanner(''), 4000);
+        }
+      } catch (err: any) {
+        setSaveBanner(err.message || 'Import failed.');
+        setTimeout(() => setSaveBanner(''), 4000);
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Aggregates
@@ -374,14 +490,37 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {assets.length === 0 && (
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             <button
-              onClick={handleLoadDemo}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+              onClick={handleExportWholeVault}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all shadow-xs cursor-pointer"
+              title="Export whole dataset in a single JSON backup file"
             >
-              Load Starter Portfolio
+              <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Export All</span>
             </button>
-          )}
+            <label
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all shadow-xs cursor-pointer"
+              title="Import whole dataset from a single JSON or CSV file"
+            >
+              <Upload className="w-3.5 h-3.5 text-primary" />
+              <span>Import All</span>
+              <input
+                type="file"
+                accept=".json,.csv"
+                onChange={handleImportWholeVault}
+                className="hidden"
+              />
+            </label>
+            {assets.length === 0 && (
+              <button
+                onClick={handleLoadDemo}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+              >
+                Load Starter Portfolio
+              </button>
+            )}
+          </div>
         </div>
 
         {/* =========================================================================
@@ -513,7 +652,7 @@ export default function DashboardPage() {
               Quick Add
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               {/* Tile 1: Expense */}
               <button
                 onClick={() => {
@@ -551,15 +690,33 @@ export default function DashboardPage() {
               </button>
 
               {/* Tile 4: Import */}
-              <Link
-                href="/import"
+              <label
                 className="bg-card border border-border hover:border-emerald-500/40 hover:bg-emerald-500/5 rounded-2xl p-4 text-center transition-all shadow-xs group cursor-pointer flex flex-col items-center justify-center gap-2"
+                title="Upload and restore whole vault file (.json / .csv)"
               >
                 <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <UploadCloud className="w-5 h-5" />
                 </div>
                 <span className="text-xs font-semibold text-foreground">Import</span>
-              </Link>
+                <input
+                  type="file"
+                  accept=".json,.csv"
+                  onChange={handleImportWholeVault}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Tile 5: Export */}
+              <button
+                onClick={handleExportWholeVault}
+                className="bg-card border border-border hover:border-purple-500/40 hover:bg-purple-500/5 rounded-2xl p-4 text-center transition-all shadow-xs group cursor-pointer flex flex-col items-center justify-center gap-2"
+                title="Download whole vault in a single JSON backup file"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Download className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-semibold text-foreground">Export</span>
+              </button>
             </div>
           </div>
 

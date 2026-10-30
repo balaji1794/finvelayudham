@@ -15,6 +15,10 @@ import {
   Calendar,
   Plus,
   Lightbulb,
+  Pencil,
+  Check,
+  X,
+  Trash2,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import WealthSubNav from '@/components/WealthSubNav';
@@ -24,6 +28,13 @@ import { formatCurrency, convertAmount } from '@/lib/currencies';
 import { useAuth } from '@/context/AuthContext';
 import { usePrivacy } from '@/context/PrivacyContext';
 import { loadUserPortfolio } from '@/lib/portfolio-vault';
+
+interface SipInstrument {
+  id: string;
+  name: string;
+  monthlyAmount: number;
+  source: 'asset' | 'custom';
+}
 
 function AllocationContent() {
   const router = useRouter();
@@ -64,6 +75,29 @@ function AllocationContent() {
     COMMODITIES: 10,
     CASH: 5,
   });
+
+  // Monthly SIP Plan State (Matches Image 1)
+  const [sipBudget, setSipBudget] = useState<number>(50000);
+  const [isEditingBudget, setIsEditingBudget] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('50000');
+  const [sipViewMode, setSipViewMode] = useState<'amount' | 'pct'>('amount');
+  const [sipSource, setSipSource] = useState<'asset' | 'custom'>('custom');
+  const [sipName, setSipName] = useState('');
+  const [sipAmount, setSipAmount] = useState('');
+  const [sipInstruments, setSipInstruments] = useState<SipInstrument[]>([
+    {
+      id: 'sip-1',
+      name: 'Nippon India Gold BeES ETF',
+      monthlyAmount: 15000,
+      source: 'custom',
+    },
+    {
+      id: 'sip-2',
+      name: 'ICICI Prudential Large & Mid Cap Fund',
+      monthlyAmount: 35000,
+      source: 'custom',
+    },
+  ]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -139,6 +173,39 @@ function AllocationContent() {
   }, [assets, targets, totalAssetValue, currency]);
 
   const offTargetCount = categoryStats.filter((c) => Math.abs(c.gapPct) >= 5).length;
+
+  // SIP Handlers
+  const handleSaveBudget = () => {
+    const num = parseFloat(budgetInput);
+    if (!isNaN(num) && num >= 0) {
+      setSipBudget(num);
+    }
+    setIsEditingBudget(false);
+  };
+
+  const handleAddSipInstrument = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(sipAmount);
+    if (!sipName.trim() || isNaN(amt) || amt <= 0) return;
+
+    const newInst: SipInstrument = {
+      id: 'sip_' + Math.random().toString(36).substring(2, 8),
+      name: sipName.trim(),
+      monthlyAmount: amt,
+      source: sipSource,
+    };
+    setSipInstruments([...sipInstruments, newInst]);
+    setSipName('');
+    setSipAmount('');
+  };
+
+  const handleDeleteSipInstrument = (id: string) => {
+    setSipInstruments(sipInstruments.filter((inst) => inst.id !== id));
+  };
+
+  const totalSipAllocated = useMemo(() => {
+    return sipInstruments.reduce((sum, inst) => sum + inst.monthlyAmount, 0);
+  }, [sipInstruments]);
 
   return (
     <AppLayout
@@ -450,10 +517,10 @@ function AllocationContent() {
           </div>
         )}
 
-        {/* 3. MONTHLY SIP PLAN TAB (FinBoom exact layout) */}
+        {/* 3. MONTHLY SIP PLAN TAB (Matches FinBoom Image 1 Exactly) */}
         {subTab === 'sip' && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-card p-5 shadow-xs space-y-6">
+            <div className="rounded-lg border border-border bg-card p-5 shadow-xs space-y-5">
               <div>
                 <h2 className="font-semibold text-base text-foreground">
                   Monthly Investment Plan
@@ -463,45 +530,234 @@ function AllocationContent() {
                 </p>
               </div>
 
-              {/* Callout Card: Set a monthly budget */}
-              <div className="rounded-md border border-border/60 bg-muted/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
-                    <Lightbulb className="w-4 h-4" />
+              {/* Budget Line with Inline Pencil Edit */}
+              <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+                <span>Budget:</span>
+                {isEditingBudget ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      value={budgetInput}
+                      onChange={(e) => setBudgetInput(e.target.value)}
+                      className="px-2 py-0.5 rounded border border-input bg-background text-foreground text-xs font-mono w-28 focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <button
+                      onClick={handleSaveBudget}
+                      className="p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setIsEditingBudget(false)}
+                      className="p-1 rounded hover:bg-muted"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-foreground">Set a monthly budget</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                      Enter a total monthly amount and then add each instrument as a percentage — e.g.{' '}
-                      <span className="text-foreground font-medium">Axis BC Fund at 30%</span>,{' '}
-                      <span className="text-foreground font-medium">Nifty at 50%</span>, etc.
-                    </p>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-foreground">
+                      {maskValue(formatCurrency(sipBudget, currency))}/mo
+                    </span>
+                    <button
+                      onClick={() => {
+                        setBudgetInput(sipBudget.toString());
+                        setIsEditingBudget(true);
+                      }}
+                      className="p-1 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                </div>
-                <button className="text-xs font-semibold text-primary hover:underline shrink-0 self-start sm:self-auto">
-                  Set budget →
-                </button>
+                )}
               </div>
 
-              {/* Empty State */}
-              <div className="text-center py-12 px-4 rounded-md border border-dashed border-border/80 space-y-3">
-                <div className="inline-flex p-3 rounded-full bg-muted/60 text-2xl">
-                  💰
+              {/* Inline Instrument Adder Bar (Exact Image 1 layout) */}
+              <form onSubmit={handleAddSipInstrument} className="rounded-lg border border-border/80 bg-muted/20 p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 flex-1">
+                  <div className="flex items-center gap-1 bg-muted p-0.5 rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => setSipSource('asset')}
+                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                        sipSource === 'asset'
+                          ? 'bg-card text-foreground font-semibold shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      From Assets
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSipSource('custom')}
+                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                        sipSource === 'custom'
+                          ? 'bg-card text-foreground font-semibold shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Custom Name
+                    </button>
+                  </div>
+
+                  {sipSource === 'custom' ? (
+                    <input
+                      type="text"
+                      placeholder="e.g. Goldbees, Axis Small Cap..."
+                      value={sipName}
+                      onChange={(e) => setSipName(e.target.value)}
+                      className="flex-1 min-w-[200px] px-3 py-1.5 rounded-md border border-input bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  ) : (
+                    <select
+                      value={sipName}
+                      onChange={(e) => setSipName(e.target.value)}
+                      className="flex-1 min-w-[200px] px-3 py-1.5 rounded-md border border-input bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="">Select an existing holding...</option>
+                      {assets.slice(0, 50).map((a) => (
+                        <option key={a.id} value={a.name}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <input
+                    type="number"
+                    placeholder="Monthly amt"
+                    value={sipAmount}
+                    onChange={(e) => setSipAmount(e.target.value)}
+                    className="w-28 px-3 py-1.5 rounded-md border border-input bg-background text-xs text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="px-2 py-1.5 rounded-md border border-input bg-background text-xs text-muted-foreground font-mono"
+                  >
+                    <option value="INR">INR</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+
+                  <button
+                    type="submit"
+                    className="p-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer"
+                    title="Add SIP instrument"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSipName('');
+                      setSipAmount('');
+                    }}
+                    className="p-1.5 rounded-md text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
+                    title="Clear"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="space-y-1">
+
+                <div className="flex items-center gap-1 bg-muted p-0.5 rounded-md self-end md:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setSipViewMode('amount')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                      sipViewMode === 'amount'
+                        ? 'bg-card text-foreground font-semibold shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Amount
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSipViewMode('pct')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                      sipViewMode === 'pct'
+                        ? 'bg-card text-foreground font-semibold shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    % of budget
+                  </button>
+                </div>
+              </form>
+
+              {/* Instrument Table */}
+              {sipInstruments.length > 0 ? (
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/40 border-b border-border text-muted-foreground font-semibold">
+                      <tr>
+                        <th className="p-3">Instrument</th>
+                        <th className="p-3 text-right">
+                          {sipViewMode === 'amount' ? 'Monthly Amount' : '% of Budget'}
+                        </th>
+                        <th className="p-3 text-right">Allocation Bar</th>
+                        <th className="p-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {sipInstruments.map((inst) => {
+                        const pctOfBudget = sipBudget > 0 ? (inst.monthlyAmount / sipBudget) * 100 : 0;
+                        return (
+                          <tr key={inst.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="p-3 font-medium text-foreground">
+                              {inst.name}
+                            </td>
+                            <td className="p-3 text-right font-mono font-medium text-foreground">
+                              {sipViewMode === 'amount'
+                                ? maskValue(formatCurrency(inst.monthlyAmount, currency))
+                                : `${pctOfBudget.toFixed(1)}%`}
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="w-24 ml-auto h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-600 dark:bg-emerald-400 rounded-full"
+                                  style={{ width: `${Math.min(pctOfBudget, 100)}%` }}
+                                />
+                              </div>
+                            </td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => handleDeleteSipInstrument(inst.id)}
+                                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="bg-muted/30 border-t border-border font-semibold">
+                      <tr>
+                        <td className="p-3 text-foreground">Total Monthly Allocation</td>
+                        <td className="p-3 text-right font-mono text-foreground">
+                          {sipViewMode === 'amount'
+                            ? maskValue(formatCurrency(totalSipAllocated, currency))
+                            : `${sipBudget > 0 ? ((totalSipAllocated / sipBudget) * 100).toFixed(1) : 0}%`}
+                        </td>
+                        <td colSpan={2} className="p-3 text-right text-muted-foreground font-mono">
+                          of {maskValue(formatCurrency(sipBudget, currency))} budget
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-10 px-4 rounded-md border border-dashed border-border/80 space-y-2">
+                  <div className="inline-flex p-3 rounded-full bg-muted/60 text-2xl">💰</div>
                   <h3 className="font-semibold text-sm text-foreground">No monthly SIP plan yet</h3>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Track your monthly investments across mutual funds, stocks, and other instruments.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Add your SIPs to see where your money goes each month.
+                    Use the form above to add your monthly SIPs across mutual funds and stocks.
                   </p>
                 </div>
-                <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Instrument</span>
-                </button>
-              </div>
+              )}
             </div>
           </div>
         )}
