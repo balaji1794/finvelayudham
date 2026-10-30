@@ -114,8 +114,47 @@ export async function POST(req: Request) {
       let deliveredTo = cleanEmail;
       let dispatchLog = '';
 
-      // 1. Try Resend Direct
-      if (resendApiKey) {
+      // 1. Prioritize SMTP (Gmail SMTP) when credentials are provided in Vercel
+      if (smtpUser && smtpPass) {
+        try {
+          const cleanPass = smtpPass.trim().replace(/\s+/g, '');
+          const isGmail = (smtpHost || '').toLowerCase().includes('gmail');
+
+          const transporterConfig = isGmail
+            ? {
+                service: 'gmail',
+                auth: { user: smtpUser.trim(), pass: cleanPass },
+              }
+            : {
+                host: smtpHost,
+                port: smtpPort,
+                secure: smtpPort === 465,
+                auth: { user: smtpUser.trim(), pass: cleanPass },
+              };
+
+          const transporter = nodemailer.createTransport(transporterConfig as any);
+
+          const sender = `FinVelayudham <${smtpUser.trim()}>`;
+
+          const info = await transporter.sendMail({
+            from: sender,
+            to: cleanEmail,
+            subject: emailSubject,
+            html: emailHtml,
+          });
+
+          delivered = true;
+          deliveredTo = cleanEmail;
+          dispatchLog = `Delivered via SMTP to ${cleanEmail} (ID: ${info.messageId})`;
+          console.log(`[FinVelayudham Auth] Verification code successfully delivered to ${cleanEmail} via SMTP`);
+        } catch (err: any) {
+          dispatchLog = `SMTP error: ${err.message}`;
+          console.error('SMTP verify dispatch error:', err);
+        }
+      }
+
+      // 2. Fallback to Resend Direct if SMTP was not used or failed
+      if (!delivered && resendApiKey) {
         try {
           const resendRes = await fetch('https://api.resend.com/emails', {
             method: 'POST',
@@ -136,40 +175,14 @@ export async function POST(req: Request) {
           if (resendRes.ok && resendData.id) {
             delivered = true;
             deliveredTo = cleanEmail;
-            dispatchLog = `Direct Resend delivery to ${cleanEmail} (ID: ${resendData.id})`;
+            dispatchLog += ` | Delivered via Resend to ${cleanEmail} (ID: ${resendData.id})`;
           } else {
-            dispatchLog = `Direct Resend failed: ${resendRes.status} ${JSON.stringify(resendData)}`;
+            dispatchLog += ` | Resend rejected: ${resendRes.status} ${JSON.stringify(resendData)}`;
             console.warn('[FinVelayudham Auth]', dispatchLog);
           }
         } catch (err: any) {
-          dispatchLog = `Resend exception: ${err.message}`;
+          dispatchLog += ` | Resend exception: ${err.message}`;
           console.error('Resend verify dispatch error:', err);
-        }
-      }
-
-      // 2. If not delivered and SMTP is configured, send via SMTP directly to the actual recipient
-      if (!delivered && smtpUser && smtpPass) {
-        try {
-          const transporter = nodemailer.createTransport({
-            host: smtpHost,
-            port: smtpPort,
-            secure: smtpPort === 465,
-            auth: { user: smtpUser, pass: smtpPass },
-          });
-
-          const info = await transporter.sendMail({
-            from: smtpUser ? `FinVelayudham <${smtpUser}>` : fromEmail,
-            to: cleanEmail,
-            subject: emailSubject,
-            html: emailHtml,
-          });
-          delivered = true;
-          deliveredTo = cleanEmail;
-          dispatchLog = `Delivered via SMTP to ${cleanEmail} (ID: ${info.messageId})`;
-          console.log(`[FinVelayudham Auth] Verification code successfully delivered to ${cleanEmail} via SMTP`);
-        } catch (err: any) {
-          dispatchLog += ` | SMTP error: ${err.message}`;
-          console.error('SMTP verify dispatch error:', err);
         }
       }
 

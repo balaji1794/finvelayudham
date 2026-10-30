@@ -88,7 +88,46 @@ export async function POST(req: Request) {
 </html>
     `;
 
-    // 1. Dispatch via Resend API if API Key is configured in environment
+    // 1. Dispatch via SMTP / Gmail if credentials configured (supports any recipient worldwide)
+    if (smtpUser && smtpPass) {
+      try {
+        const cleanPass = smtpPass.trim().replace(/\s+/g, '');
+        const isGmail = (smtpHost || '').toLowerCase().includes('gmail');
+
+        const transporterConfig = isGmail
+          ? {
+              service: 'gmail',
+              auth: { user: smtpUser.trim(), pass: cleanPass },
+            }
+          : {
+              host: smtpHost,
+              port: smtpPort,
+              secure: smtpPort === 465,
+              auth: { user: smtpUser.trim(), pass: cleanPass },
+            };
+
+        const transporter = nodemailer.createTransport(transporterConfig as any);
+
+        const info = await transporter.sendMail({
+          from: `FinVelayudham <${smtpUser.trim()}>`,
+          to: email,
+          subject: emailSubject,
+          html: emailHtml,
+        });
+
+        return NextResponse.json({
+          success: true,
+          delivered: true,
+          provider: 'smtp',
+          id: info.messageId,
+          message: `Confirmation email dispatched via SMTP to ${email}`,
+        });
+      } catch (err: any) {
+        console.error('SMTP transmission error:', err);
+      }
+    }
+
+    // 2. Dispatch via Resend API if API Key is configured in environment
     if (resendApiKey) {
       try {
         const resendRes = await fetch('https://api.resend.com/emails', {
