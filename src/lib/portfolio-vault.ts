@@ -1,5 +1,11 @@
 import { Asset, Liability, Snapshot, Transaction, Goal } from './types';
 import { encryptPortfolioData, decryptPortfolioData } from './crypto';
+import {
+  USER_REAL_ASSETS,
+  USER_REAL_GOALS,
+  USER_REAL_LIABILITIES,
+  USER_REAL_SNAPSHOTS,
+} from './user-portfolio-data';
 
 export interface UserPortfolio {
   userId: string;
@@ -296,11 +302,44 @@ export async function loadUserPortfolio(
       console.warn('Server vault fetch skipped or offline:', err);
     }
 
+    // 5. Default auto-seed for authentic statement holdings (Zerodha stocks, ICICI Pru MF, FinBoom goals)
+    if (cleanEmail.includes('sharmashree') || cleanEmail.includes('balaji') || !cleanEmail) {
+      console.info(`[FinVelayudham Vault] Initializing authentic statement portfolio for ${cleanEmail}`);
+      return await loadRealStatementsPortfolio(userId, cleanEmail || userEmail, secretKey);
+    }
+
     return defaultEmptyPortfolio;
   } catch (err) {
     console.error('Error loading encrypted user vault:', err);
     return defaultEmptyPortfolio;
   }
+}
+
+/**
+ * Populate with the user's authentic downloaded portfolio statements:
+ * 232 Zerodha stocks & SGBs, ICICI Prudential Mutual Funds, and FinBoom Retirement Corpus goal.
+ * Total Net Worth: ₹91,25,116.53
+ */
+export async function loadRealStatementsPortfolio(
+  userId: string,
+  userEmail: string,
+  secretKey: string = userId
+): Promise<UserPortfolio> {
+  const syncedPortfolio: UserPortfolio = {
+    userId,
+    email: userEmail,
+    currency: 'INR',
+    assets: [...USER_REAL_ASSETS],
+    liabilities: [...USER_REAL_LIABILITIES],
+    goals: [...USER_REAL_GOALS],
+    snapshots: [...USER_REAL_SNAPSHOTS],
+    transactions: [],
+    updatedAt: new Date().toISOString(),
+    isEncrypted: true,
+  };
+
+  await saveUserPortfolio(syncedPortfolio, secretKey);
+  return syncedPortfolio;
 }
 
 /**
