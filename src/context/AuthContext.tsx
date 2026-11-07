@@ -258,6 +258,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => {});
     }
 
+    // Automated background parity check against FinBoom reference site on every login
+    fetch('/api/sync/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ referenceUrl: 'https://www.finboom.app' }),
+    }).catch(() => {});
+
     const emailResult = await dispatchWelcomeEmail(cleanEmail, displayName, 'login');
     return {
       success: true,
