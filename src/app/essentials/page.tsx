@@ -104,6 +104,25 @@ export default function EssentialsPage() {
       }
     }
     if (user) initVault();
+
+    const handleSynced = () => {
+      if (user) initVault();
+      try {
+        const stored = localStorage.getItem('finboom_financial_profile');
+        if (stored) {
+          const p = JSON.parse(stored);
+          setProfile(p);
+          setEditAge(p.age || 31);
+          setEditIncome(p.monthlyIncome || 190000);
+          setEditExpense(p.monthlyExpense || 40000);
+          setEditDependents(p.dependents ?? 2);
+          setEditTermCover(p.termCover || 20000000);
+          setEditHealthCover(p.healthCover || 1000000);
+        }
+      } catch {}
+    };
+    window.addEventListener('finvelayudham_vault_synced', handleSynced);
+    return () => window.removeEventListener('finvelayudham_vault_synced', handleSynced);
   }, [user]);
 
   const saveProfile = (e: React.FormEvent) => {

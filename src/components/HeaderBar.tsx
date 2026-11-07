@@ -18,11 +18,13 @@ import {
   ShieldCheck,
   CheckCircle2,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePrivacy } from '@/context/PrivacyContext';
 import ThemeToggle from './ThemeToggle';
 import CurrencySelector from './CurrencySelector';
+import SyncFinboomModal from './SyncFinboomModal';
 
 interface HeaderBarProps {
   onToggleMobileSidebar?: () => void;
@@ -43,6 +45,7 @@ export default function HeaderBar({
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -94,6 +97,19 @@ export default function HeaderBar({
 
       {/* Right: Actions matching FinBoom */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Sync with FinBoom Button */}
+        <button
+          onClick={() => setSyncModalOpen(true)}
+          title="Synchronize design, content, style & portfolio with FinBoom reference"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold transition-all cursor-pointer shadow-xs group"
+          aria-label="Sync with FinBoom"
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 group-hover:rotate-180 transition-transform duration-500" />
+          <span className="hidden sm:inline">Sync FinBoom</span>
+          <span className="sm:hidden">Sync</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        </button>
+
         {/* Currency Switcher */}
         <div className="hidden sm:block">
           <CurrencySelector currentCurrency={currency} onCurrencyChange={onCurrencyChange} />
@@ -246,6 +262,9 @@ export default function HeaderBar({
           )}
         </div>
       </div>
+
+      {/* FinBoom Parity & Sync Modal */}
+      <SyncFinboomModal isOpen={syncModalOpen} onClose={() => setSyncModalOpen(false)} />
     </header>
   );
 }

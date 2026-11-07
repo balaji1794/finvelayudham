@@ -101,6 +101,12 @@ export default function DashboardPage() {
     if (user) {
       initVault();
     }
+
+    const handleSynced = () => {
+      if (user) initVault();
+    };
+    window.addEventListener('finvelayudham_vault_synced', handleSynced);
+    return () => window.removeEventListener('finvelayudham_vault_synced', handleSynced);
   }, [user]);
 
   // Save changes to encrypted vault

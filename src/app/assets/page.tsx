@@ -61,6 +61,12 @@ export default function AssetsPage() {
     if (user) {
       initVault();
     }
+
+    const handleSynced = () => {
+      if (user) initVault();
+    };
+    window.addEventListener('finvelayudham_vault_synced', handleSynced);
+    return () => window.removeEventListener('finvelayudham_vault_synced', handleSynced);
   }, [user]);
 
   const persistChanges = async (updatedAssets: Asset[]) => {

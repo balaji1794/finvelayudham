@@ -58,14 +58,21 @@ export default function AccountsPage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('finboom_user_accounts');
-      if (stored) {
-        setAccounts(JSON.parse(stored));
+    const loadAccounts = () => {
+      try {
+        const stored = localStorage.getItem('finboom_user_accounts');
+        if (stored) {
+          setAccounts(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.warn('Could not parse accounts:', e);
       }
-    } catch (e) {
-      console.warn('Could not parse accounts:', e);
-    }
+    };
+    loadAccounts();
+
+    const handleSynced = () => loadAccounts();
+    window.addEventListener('finvelayudham_vault_synced', handleSynced);
+    return () => window.removeEventListener('finvelayudham_vault_synced', handleSynced);
   }, []);
 
   const saveAccounts = (newAccounts: AccountItem[]) => {

@@ -120,6 +120,20 @@ function AllocationContent() {
       }
     }
     initVault();
+
+    const handleSynced = () => {
+      if (user) initVault();
+      try {
+        const storedSip = localStorage.getItem('finboom_sip_plan');
+        if (storedSip) {
+          const parsed = JSON.parse(storedSip);
+          if (parsed.budget) setSipBudget(parsed.budget);
+          if (parsed.instruments) setSipInstruments(parsed.instruments);
+        }
+      } catch {}
+    };
+    window.addEventListener('finvelayudham_vault_synced', handleSynced);
+    return () => window.removeEventListener('finvelayudham_vault_synced', handleSynced);
   }, [user]);
 
   const totalAssetValue = useMemo(() => {

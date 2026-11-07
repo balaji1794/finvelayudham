@@ -71,6 +71,26 @@ export default function BudgetPage() {
     }
   }, [user, authLoading, router]);
 
+  useEffect(() => {
+    const loadBudget = () => {
+      try {
+        const key = `finboom_budget_${currentDate.toISOString().slice(0, 7)}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBudgetEntries(parsed);
+          }
+        }
+      } catch {}
+    };
+    loadBudget();
+
+    const handleSynced = () => loadBudget();
+    window.addEventListener('finvelayudham_vault_synced', handleSynced);
+    return () => window.removeEventListener('finvelayudham_vault_synced', handleSynced);
+  }, [currentDate]);
+
   const monthYearLabel = useMemo(() => {
     return currentDate.toLocaleDateString('en-US', {
       month: 'long',
